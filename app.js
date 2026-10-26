@@ -661,7 +661,7 @@ async function handleTestConnection(provider) {
 }
 
 // ---------- Unified LLM Dispatcher ----------
-async function dispatchAI(systemPrompt, userPrompt, chosenEngine) {
+async function dispatchAI(systemPrompt, userPrompt, chosenEngine, endpoint = '/api/lesson', extraPayload = {}) {
   const engine = chosenEngine || DOM.modelSelect.value || state.activeEngine;
 
   // 1. If backend server is active and user didn't force offline mode, try server first
@@ -694,23 +694,30 @@ async function dispatchAI(systemPrompt, userPrompt, chosenEngine) {
         baseUrl = state.ollamaUrl;
       }
 
-      const res = await fetch('/api/lesson', {
+      const requestPayload = {
+        topic: state.topic || 'Variables',
+        level: state.level || 'Beginner',
+        language: state.language || 'English',
+        backend: backendName,
+        base_url: baseUrl,
+        model: model,
+        api_key: key,
+        ...extraPayload,
+      };
+
+      const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          topic: state.topic || 'Variables',
-          level: state.level || 'Beginner',
-          language: state.language || 'English',
-          backend: backendName,
-          base_url: baseUrl,
-          model: model,
-          api_key: key,
-        }),
+        body: JSON.stringify(requestPayload),
       });
 
       if (res.ok) {
         const json = await res.json();
-        if (json.success && json.lesson) return json.lesson;
+        if (json.success) {
+          if (json.lesson) return json.lesson;
+          if (json.feedback) return json.feedback;
+          if (json.answer) return json.answer;
+        }
       }
     } catch (e) {
       // Server call failed, fall through to direct browser call
@@ -747,6 +754,16 @@ async function dispatchAI(systemPrompt, userPrompt, chosenEngine) {
     return await callOllamaDirect(systemPrompt, userPrompt, state.ollamaUrl, state.ollamaModel);
   } else {
     // 3. Smart Offline Mode Fallback
+    if (endpoint === '/api/feedback') {
+      return evaluateClientAnswer(extraPayload.answer || '', state.topic, state.language);
+    } else if (endpoint === '/api/ask') {
+      return {
+        direct_answer: `In Computer Science, "${state.topic}" enables clear data organization and control flow. The key is understanding how instructions execute sequentially and modify memory state.`,
+        analogy: "Think of an instruction manual where each step must be followed in strict order to achieve the desired result.",
+        code_example: `# Simple illustration\nprint("Understanding ${state.topic}")`,
+        pro_tip: "Always test with small, simple inputs first before writing complex logic.",
+      };
+    }
     return getClientLesson(state.topic, state.language);
   }
 }
@@ -1158,7 +1175,7 @@ Return JSON with keys:
     }
 
     if (!ansData) {
-      ansData = await dispatchAI(systemPrompt, userPrompt, chosenEngine);
+      ansData = await dispatchAI(systemPrompt, userPrompt, chosenEngine, '/api/ask', { question, code_context: codeContext });
     }
 
     renderDoubtAnswer(ansData);
@@ -1257,7 +1274,11 @@ Return JSON with keys:
 - "next_question": adaptive next practice question
 - "study_next": recommended next concept`;
 
-      feedbackData = await dispatchAI(systemPrompt, userPrompt, chosenEngine);
+      feedbackData = await dispatchAI(systemPrompt, userPrompt, chosenEngine, '/api/feedback', {
+        lesson: state.lesson || {},
+        question: state.question,
+        answer: answer,
+      });
     }
 
     // 3. Client-side heuristic fallback
