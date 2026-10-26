@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OpenLearn AI — Multilingual Adaptive CS Tutor</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <!-- Mermaid.js for visual flowcharts -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <!-- Canvas Confetti for gamification celebrations -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
+</head>
+<body>
+  <!-- Top Navigation Bar -->
+  <header class="navbar">
+    <div class="nav-container">
+      <div class="brand">
+        <span class="brand-icon">🎓</span>
+        <div class="brand-text">
+          <span class="brand-title">OpenLearn AI</span>
+          <span class="brand-tag">Multilingual CS Tutor</span>
+        </div>
+      </div>
+
+      <!-- Gamification HUD -->
+      <div class="hud">
+        <div class="hud-item rank-badge" id="hudRank">
+          <span class="hud-icon">🌱</span>
+          <span id="rankText">Rookie Coder</span>
+        </div>
+        <div class="hud-item xp-badge" id="hudXP">
+          <span class="hud-icon">⚡</span>
+          <span id="xpText">0 XP</span>
+        </div>
+        <div class="hud-item streak-badge" id="hudStreak">
+          <span class="hud-icon">🔥</span>
+          <span id="streakText">0 Streak</span>
+        </div>
+        <div class="hud-item status-badge" id="statusBadge" title="Click to view AI Engine Settings">
+          <span class="status-dot"></span>
+          <span id="statusText">Checking Engine...</span>
+        </div>
+        <button id="settingsBtn" class="hud-item settings-btn" title="AI Settings & API Keys" type="button">
+          <span>⚙️ Settings</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Settings Modal (Cloud API Key / Engine Switcher) -->
+  <div id="settingsModal" class="modal hidden">
+    <div class="modal-content card">
+      <div class="modal-header">
+        <h3>⚙️ AI Engine & Cloud Settings</h3>
+        <button id="closeSettingsBtn" class="close-btn" type="button">&times;</button>
+      </div>
+      <p class="modal-sub">
+        OpenLearn AI runs seamlessly with local Ollama, Cloud APIs (Groq / Gemini), or 100% offline Client-Side Mode.
+      </p>
+      <div class="form-group">
+        <label for="groqApiKeyInput">Groq Cloud API Key (Optional — for sub-second cloud AI):</label>
+        <input type="password" id="groqApiKeyInput" placeholder="gsk_..." autocomplete="off">
+        <small class="helper-text">Get a free key in 30 seconds at <a href="https://console.groq.com/keys" target="_blank" rel="noopener">console.groq.com</a>.</small>
+      </div>
+      <div class="form-group">
+        <label for="ollamaUrlInput">Local Ollama URL:</label>
+        <input type="text" id="ollamaUrlInput" value="http://localhost:11434">
+      </div>
+      <div class="modal-actions">
+        <button id="saveSettingsBtn" class="btn btn-primary" type="button">Save Settings</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main Container -->
+  <main class="main-container">
+    <!-- Hero / Headline -->
+    <section class="hero-section">
+      <h1 class="hero-title">Master Computer Science in <span class="gradient-text">Your Mother Tongue</span></h1>
+      <p class="hero-subtitle">
+        Democratizing technical education with everyday cultural analogies, dynamic visual flowcharts, 
+        interactive code playgrounds, and adaptive misconception diagnosis.
+      </p>
+
+      <!-- Quick Topic Chips -->
+      <div class="quick-topics">
+        <span class="topics-label">Quick Topics:</span>
+        <div class="chip-container" id="quickTopicsContainer">
+          <button class="topic-chip active" data-topic="Variables & Memory">📦 Variables</button>
+          <button class="topic-chip" data-topic="Loops & Iterations">🔁 Loops</button>
+          <button class="topic-chip" data-topic="Conditionals (If-Else)">🔀 If-Else</button>
+          <button class="topic-chip" data-topic="Functions & Scope">🎯 Functions</button>
+          <button class="topic-chip" data-topic="Lists & Arrays">📚 Lists</button>
+          <button class="topic-chip" data-topic="Recursion & Call Stack">🔄 Recursion</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Learning Config Card -->
+    <section class="card config-card">
+      <div class="form-grid">
+        <div class="form-group topic-group">
+          <label for="topicInput">Concept or Topic</label>
+          <input type="text" id="topicInput" value="Variables & Memory" placeholder="e.g. Variables, Loops, Binary Search, What is an API...">
+        </div>
+        <div class="form-group">
+          <label for="levelSelect">Pedagogy Level</label>
+          <select id="levelSelect">
+            <option value="Absolute beginner" selected>Absolute beginner</option>
+            <option value="Beginner">Beginner</option>
+            <option value="Confident beginner">Confident beginner</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="langSelect">Language (மொழி / भाषा)</label>
+          <select id="langSelect">
+            <option value="English" selected>English</option>
+            <option value="தமிழ் (Tamil)">தமிழ் (Tamil)</option>
+            <option value="हिन्दी (Hindi)">हिन्दी (Hindi)</option>
+            <option value="తెలుగు (Telugu)">తెలుగు (Telugu)</option>
+            <option value="ಕನ್ನಡ (Kannada)">ಕನ್ನಡ (Kannada)</option>
+            <option value="Español (Spanish)">Español (Spanish)</option>
+            <option value="Français (French)">Français (French)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="modelSelect">AI Model Engine</label>
+          <select id="modelSelect">
+            <option value="demo">Interactive Mode (Offline & Instant)</option>
+            <option value="groq">Groq Cloud (Llama 3.3 70B - Sub-Second)</option>
+            <option value="llama3.2">Ollama (llama3.2)</option>
+            <option value="llama3.1">Ollama (llama3.1)</option>
+            <option value="qwen2.5">Ollama (qwen2.5)</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="action-row">
+        <button id="startLessonBtn" class="btn btn-primary" type="button">
+          <span class="btn-icon">✨</span>
+          <span class="btn-text">Start Learning Session</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- Loading State -->
+    <div id="loadingIndicator" class="loading-container hidden">
+      <div class="spinner"></div>
+      <p id="loadingMsg">Generating personalized lesson, analogy & mental model...</p>
+    </div>
+
+    <!-- Active Lesson Display -->
+    <section id="lessonSection" class="card lesson-card hidden">
+      <div class="lesson-header">
+        <div class="lesson-badge-group">
+          <span class="badge topic-badge" id="lessonTopicBadge">Variables</span>
+          <span class="badge level-badge" id="lessonLevelBadge">Absolute beginner</span>
+          <span class="badge lang-badge" id="lessonLangBadge">English</span>
+        </div>
+        <div class="lesson-actions">
+          <button id="audioBtn" class="btn btn-secondary btn-sm" title="Audio Read-Aloud" type="button">
+            <span id="audioIcon">🔊</span>
+            <span id="audioLabel">Read Aloud</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Explanation & Everyday Analogy -->
+      <div class="lesson-body">
+        <div class="explanation-box">
+          <h3 class="section-heading">💡 Intuitive Explanation</h3>
+          <p id="explanationText" class="rich-text"></p>
+        </div>
+
+        <div class="analogy-box">
+          <h3 class="section-heading">🏠 Everyday Real-World Analogy</h3>
+          <div class="analogy-content">
+            <span class="quote-icon">❝</span>
+            <p id="analogyText" class="rich-text"></p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Interactive Concept Views (Tabs: Visual Flowchart vs Code Sandbox) -->
+      <div class="tabs-container">
+        <div class="tabs-header">
+          <button class="tab-btn active" data-tab="tabDiagram" type="button">📊 Visual Mental Model (Flowchart)</button>
+          <button class="tab-btn" data-tab="tabCode" type="button">💻 Live Code Playground</button>
+        </div>
+
+        <div id="tabDiagram" class="tab-content active">
+          <div class="diagram-wrapper">
+            <div id="mermaidDiagram" class="mermaid-canvas"></div>
+          </div>
+        </div>
+
+        <div id="tabCode" class="tab-content">
+          <div class="code-editor-wrapper">
+            <div class="code-header">
+              <span class="code-title">Python Interactive Sandbox</span>
+              <button id="copyCodeBtn" class="btn-copy" type="button">📋 Copy</button>
+            </div>
+            <pre class="code-pre"><code id="exampleCode"></code></pre>
+            <div class="sandbox-controls">
+              <label for="sandboxCode" class="sandbox-label">Test and tinker with the code:</label>
+              <textarea id="sandboxCode" rows="4" spellcheck="false"></textarea>
+              <div class="sandbox-btns">
+                <button id="runCodeBtn" class="btn btn-sm btn-primary" type="button">▶ Run Code</button>
+                <button id="resetCodeBtn" class="btn btn-sm btn-secondary" type="button">↺ Reset</button>
+              </div>
+              <div class="console-box">
+                <div class="console-label">Output:</div>
+                <pre id="consoleResult">(Click "Run Code" to execute)</pre>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Practice Challenge Section -->
+    <section id="challengeSection" class="card challenge-card hidden">
+      <div class="challenge-header">
+        <div class="challenge-badge">
+          <span class="badge-icon">🎯</span>
+          <span id="roundIndicator">Practice Challenge #1</span>
+        </div>
+        <button id="hintToggleBtn" class="hint-toggle-btn" type="button">💡 Need a Hint?</button>
+      </div>
+
+      <div id="hintContent" class="hint-box hidden">
+        <span class="hint-icon">🔍</span>
+        <p id="hintText"></p>
+      </div>
+
+      <div class="question-box">
+        <h3 class="question-title">Check Your Understanding:</h3>
+        <p id="questionText" class="question-content"></p>
+      </div>
+
+      <div class="answer-box">
+        <label for="answerInput" class="answer-label">Your Reasoning (in your own words):</label>
+        <textarea id="answerInput" rows="3" placeholder="Explain your answer and why you think so..."></textarea>
+        <button id="checkAnswerBtn" class="btn btn-accent" type="button">
+          <span>🚀 Check My Reasoning</span>
+        </button>
+      </div>
+
+      <!-- Feedback & Misconception Diagnosis -->
+      <div id="feedbackContainer" class="feedback-container hidden">
+        <div id="verdictBanner" class="verdict-banner">
+          <div class="verdict-icon" id="verdictIcon"></div>
+          <div class="verdict-info">
+            <h4 id="verdictTitle"></h4>
+            <p id="feedbackSummary"></p>
+          </div>
+        </div>
+
+        <div id="misconceptionCard" class="diagnosis-card hidden">
+          <div class="diagnosis-header">
+            <span>🧠 Misconception Diagnosed</span>
+          </div>
+          <p id="misconceptionText"></p>
+        </div>
+
+        <div id="revisedExpCard" class="revised-card hidden">
+          <div class="revised-header">
+            <span>🔄 Alternative Explanation (Fresh Perspective)</span>
+          </div>
+          <p id="revisedExpText"></p>
+        </div>
+
+        <div class="next-step-row">
+          <div class="study-next-tag" id="studyNextTag"></div>
+          <button id="nextQuestionBtn" class="btn btn-primary hidden" type="button">
+            <span>👉 Proceed to Next Adaptive Question</span>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Session History / Mastery Progress -->
+    <section id="historySection" class="card history-card hidden">
+      <h3 class="section-heading">📈 Session Mastery & Progress Tracker</h3>
+      <div class="history-grid" id="historyGrid"></div>
+    </section>
+  </main>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="footer-container">
+      <span>OpenLearn AI • 100% Open-Source Multilingual CS Tutor</span>
+      <span>Deployable on GitHub Pages, Render, Hugging Face & Ollama</span>
+    </div>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>

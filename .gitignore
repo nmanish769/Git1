@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+
+# Environment Variables
+.env
+.env.local
+
+# Internal Antigravity & working archives
+extracted_project/
+hackathon_project/
+openlearn-ai/
+openlearn-ai-pro.zip
+openlearn-ai.zip
+*.zip
+
+# OS files
+.DS_Store
+Thumbs.db
