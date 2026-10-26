@@ -295,7 +295,8 @@ def evaluate_smart_answer(question: str, answer: str, lesson: Dict[str, Any], la
     q = question.lower()
     is_tamil = "tamil" in language.lower() or "தமிழ்" in language
 
-    if len(ans) < 2:
+    single_char_ok = ans in ["8", "0", "1", "2", "n"]
+    if len(ans) < 2 and not single_char_ok:
         return {
             "verdict": "incorrect",
             "xp_earned": 10,
@@ -386,3 +387,41 @@ def get_mock_lesson(topic: str, language: str) -> dict:
 
 def get_mock_feedback(answer: str) -> dict:
     return evaluate_smart_answer("", answer, MOCK_LESSONS["variables"]["English"], "English")
+
+
+def get_offline_doubt_answer(question: str, topic: str, language: str) -> Dict[str, Any]:
+    """Generates structured educational explanations for student doubts offline."""
+    lesson = get_best_matching_lesson(topic, language)
+    q_low = (question or "").lower()
+    is_tamil = "tamil" in (language or "").lower() or "தமிழ்" in (language or "")
+
+    if any(k in q_low for k in ["error", "பிழை", "bug", "traceback"]):
+        ans = (
+            f"பெரும்பாலான தொடக்க நிலை பிழைகள் தொடரியல் (Syntax) அல்லது வரையறுக்கப்படாத மாறிகளை அணுகுவதால் ஏற்படுகின்றன. உங்கள் '{topic}' குறியீட்டில் சரியான பெயர்களும் வகைகளும் உள்ளதா என சோதிக்கவும்."
+            if is_tamil else
+            f"Most beginner errors in '{topic}' stem from syntax typos, type mismatches, or accessing uninitialized variables. Verify that variable names and data types match."
+        )
+    elif any(k in q_low for k in ["why", "need", "ஏன்", "தேவை"]):
+        ans = (
+            f"நாம் '{topic}' பயன்படுத்துவதன் முக்கிய நோக்கம் குறியீட்டின் மறுபயன்பாடு (Reusability), தெளிவான கட்டமைப்பு மற்றும் நினைவகத்தை முறையாகப் பயன்படுத்துவதே ஆகும்."
+            if is_tamil else
+            f"We use '{topic}' primarily for code reusability, clean abstraction, and predictable memory management. Without it, software would require repetitive copy-pasting."
+        )
+    else:
+        ans = (
+            f"'{topic}' என்பது கணினியில் தகவல்களை சீராக கையாளவும், கட்டளைகளை வரிசையாக இயக்கவும் உதவும் அடிப்படை அமைப்பாகும்."
+            if is_tamil else
+            f"'{topic}' is a foundational building block that enables deterministic control flow and organized state manipulation in memory."
+        )
+
+    return {
+        "direct_answer": ans,
+        "analogy": lesson.get("analogy", "Think of an instruction manual where each step must be followed in strict order to achieve the desired result."),
+        "code_example": lesson.get("example", f"# Core example for {topic}\nx = 10\nprint('Concept in action:', x)"),
+        "pro_tip": (
+            "எப்போதும் பெரிய சிக்கல்களை சிறிய துண்டுகளாகப் பிரித்து, எளிய உள்ளீடுகளைக் கொண்டு முதலில் சோதிக்கவும்."
+            if is_tamil else
+            "Break complex algorithms into small testable units, and trace variable state transitions on paper."
+        ),
+        "diagram": lesson.get("diagram", "")
+    }

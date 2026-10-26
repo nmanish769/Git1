@@ -727,42 +727,71 @@ async function dispatchAI(systemPrompt, userPrompt, chosenEngine, endpoint = '/a
   // 2. Direct Browser Call based on engine
   if (engine === 'gemini') {
     if (!state.geminiKey) {
-      throw new Error("Gemini API key is required. Please click '⚙️ AI Models & Keys' to enter your free key, or select 'Smart Offline Mode'.");
+      if (endpoint === '/api/feedback') {
+        return evaluateClientAnswer(extraPayload.answer || '', state.topic, state.language);
+      } else if (endpoint === '/api/ask') {
+        return getClientDoubtAnswer(extraPayload.question || '', state.topic, state.language);
+      }
+      return getClientLesson(state.topic, state.language);
     }
     return await callGeminiDirect(systemPrompt, userPrompt, state.geminiKey, state.geminiModel);
   } else if (engine === 'groq') {
     if (!state.groqKey) {
-      throw new Error("Groq API key is required. Please click '⚙️ AI Models & Keys' to enter your free key, or select 'Smart Offline Mode'.");
+      if (endpoint === '/api/feedback') {
+        return evaluateClientAnswer(extraPayload.answer || '', state.topic, state.language);
+      } else if (endpoint === '/api/ask') {
+        return getClientDoubtAnswer(extraPayload.question || '', state.topic, state.language);
+      }
+      return getClientLesson(state.topic, state.language);
     }
     return await callGroqDirect(systemPrompt, userPrompt, state.groqKey, state.groqModel);
   } else if (engine === 'openrouter') {
     if (!state.openrouterKey) {
-      throw new Error("OpenRouter key required. Click '⚙️ AI Models & Keys' to enter key, or select 'Smart Offline Mode'.");
+      if (endpoint === '/api/feedback') {
+        return evaluateClientAnswer(extraPayload.answer || '', state.topic, state.language);
+      } else if (endpoint === '/api/ask') {
+        return getClientDoubtAnswer(extraPayload.question || '', state.topic, state.language);
+      }
+      return getClientLesson(state.topic, state.language);
     }
     return await callOpenRouterDirect(systemPrompt, userPrompt, state.openrouterKey, state.openrouterModel);
   } else if (engine === 'openai') {
     if (!state.openaiKey) {
-      throw new Error("OpenAI API key required. Click '⚙️ AI Models & Keys' to enter key, or select 'Smart Offline Mode'.");
+      if (endpoint === '/api/feedback') {
+        return evaluateClientAnswer(extraPayload.answer || '', state.topic, state.language);
+      } else if (endpoint === '/api/ask') {
+        return getClientDoubtAnswer(extraPayload.question || '', state.topic, state.language);
+      }
+      return getClientLesson(state.topic, state.language);
     }
     return await callOpenAIDirect(systemPrompt, userPrompt, state.openaiKey, state.openaiModel);
   } else if (engine === 'deepseek') {
     if (!state.deepseekKey) {
-      throw new Error("DeepSeek key required. Click '⚙️ AI Models & Keys' to enter key, or select 'Smart Offline Mode'.");
+      if (endpoint === '/api/feedback') {
+        return evaluateClientAnswer(extraPayload.answer || '', state.topic, state.language);
+      } else if (endpoint === '/api/ask') {
+        return getClientDoubtAnswer(extraPayload.question || '', state.topic, state.language);
+      }
+      return getClientLesson(state.topic, state.language);
     }
     return await callDeepSeekDirect(systemPrompt, userPrompt, state.deepseekKey, state.deepseekModel);
   } else if (engine === 'ollama') {
-    return await callOllamaDirect(systemPrompt, userPrompt, state.ollamaUrl, state.ollamaModel);
+    try {
+      return await callOllamaDirect(systemPrompt, userPrompt, state.ollamaUrl, state.ollamaModel);
+    } catch (e) {
+      if (endpoint === '/api/feedback') {
+        return evaluateClientAnswer(extraPayload.answer || '', state.topic, state.language);
+      } else if (endpoint === '/api/ask') {
+        return getClientDoubtAnswer(extraPayload.question || '', state.topic, state.language);
+      }
+      return getClientLesson(state.topic, state.language);
+    }
   } else {
     // 3. Smart Offline Mode Fallback
     if (endpoint === '/api/feedback') {
       return evaluateClientAnswer(extraPayload.answer || '', state.topic, state.language);
     } else if (endpoint === '/api/ask') {
-      return {
-        direct_answer: `In Computer Science, "${state.topic}" enables clear data organization and control flow. The key is understanding how instructions execute sequentially and modify memory state.`,
-        analogy: "Think of an instruction manual where each step must be followed in strict order to achieve the desired result.",
-        code_example: `# Simple illustration\nprint("Understanding ${state.topic}")`,
-        pro_tip: "Always test with small, simple inputs first before writing complex logic.",
-      };
+      return getClientDoubtAnswer(extraPayload.question || '', state.topic, state.language);
     }
     return getClientLesson(state.topic, state.language);
   }
@@ -1012,11 +1041,11 @@ Return strict JSON with keys:
     state.question = lessonData.question || 'Explain how this concept works in your own words.';
     renderLesson(lessonData, chosenEngine);
   } catch (err) {
-    alert(`AI Notice: ${err.message}\n\nFalling back to Smart Offline Knowledge Base.`);
+    console.warn("AI generation note:", err);
     const fallback = getClientLesson(topic, language);
     state.lesson = fallback;
     state.question = fallback.question || 'Explain this concept in your own words.';
-    renderLesson(fallback, 'Smart Offline Engine');
+    renderLesson(fallback, 'Smart Educational Engine');
   } finally {
     showLoading(false);
   }
@@ -1180,13 +1209,8 @@ Return JSON with keys:
 
     renderDoubtAnswer(ansData);
   } catch (err) {
-    alert(`Could not fetch AI explanation: ${err.message}\nUsing smart offline explanation.`);
-    renderDoubtAnswer({
-      direct_answer: `In Computer Science, "${state.topic}" enables clear data organization and control flow. The key is understanding how the computer processes instructions sequentially and updates memory state.`,
-      analogy: "Think of an instruction manual where each step must be followed in strict order to achieve the desired result.",
-      code_example: `# Simple illustration\nprint("Understanding ${state.topic}")`,
-      pro_tip: "Always test with small, simple inputs first before writing complex logic.",
-    });
+    console.warn("AI doubt note:", err);
+    renderDoubtAnswer(getClientDoubtAnswer(question, state.topic, state.language));
   } finally {
     DOM.askDoubtBtn.disabled = false;
     DOM.askDoubtBtn.innerHTML = '<span>💡 Ask AI Tutor</span>';
@@ -1288,7 +1312,7 @@ Return JSON with keys:
 
     renderFeedback(feedbackData, answer);
   } catch (err) {
-    alert(`AI Feedback Notice: ${err.message}\nEvaluating locally.`);
+    console.warn("AI feedback note:", err);
     const fallback = evaluateClientAnswer(answer, state.topic, state.language);
     renderFeedback(fallback, answer);
   } finally {
@@ -1443,6 +1467,35 @@ function evaluateClientAnswer(answer, topic, language) {
     revised_explanation: "In programming, `=` is an action: take whatever is on the right side and store it inside the container on the left.",
     next_question: "Quick check: If `score = 20`, and then we do `score = 0`, what will `score` be?",
     study_next: "Core Programming Fundamentals"
+  };
+}
+
+function getClientDoubtAnswer(question, topic, language) {
+  const lesson = getClientLesson(topic, language);
+  const qLower = (question || '').toLowerCase();
+  const isTamil = (language || '').includes('Tamil') || (language || '').includes('தமிழ்');
+
+  let directAnswer = isTamil
+    ? `"${topic}" என்ற கருத்து கணினியில் தகவல்களை சீராக நிர்வகிக்கவும், கட்டளைகளை வரிசையாக இயக்கவும் பயன்படுகிறது. உங்கள் கேள்விக்கு முக்கிய தீர்வு: கணினி ஒவ்வொரு படியையும் தொடர்ச்சியாக நினைவக மாற்றங்களுடன் நிறைவேற்றுகிறது.`
+    : `In Computer Science, "${topic}" establishes an organized mental model so the computer can execute logic sequentially. Regarding your question: the computer processes state updates step-by-step in memory, following deterministic rules.`;
+
+  if (qLower.includes('error') || qLower.includes('பிழை') || qLower.includes('bug') || qLower.includes('traceback')) {
+    directAnswer = isTamil
+      ? `பெரும்பாலான தொடக்க நிலை பிழைகள் தொடரியல் (Syntax) அல்லது வரையறுக்கப்படாத மாறிகளை (Undefined variables) அணுகுவதால் ஏற்படுகின்றன. உங்கள் குறியீட்டில் மாறியின் பெயர் சரியாக உள்ளதா மற்றும் சரியான மதிப்பை ஒதுக்கியுள்ளீர்களா என்று சோதிக்கவும்.`
+      : `Most beginner errors stem from syntax typos, mismatched data types, or referencing variables before they are initialized in memory. Check that your variable names match exactly and proper values are assigned.`;
+  } else if (qLower.includes('why') || qLower.includes('ஏன்') || qLower.includes('need') || qLower.includes('தேவை')) {
+    directAnswer = isTamil
+      ? `நாம் "${topic}" பயன்படுத்துவதன் முக்கிய நோக்கம் குறியீட்டை மீண்டும் மீண்டும் எழுதாமல், நினைவகத்தை திறம்பட பயன்படுத்தி எளிதாக நிர்வகிக்க உதவுவதே ஆகும்.`
+      : `We use "${topic}" primarily for reusability, clean abstraction, and scalable memory management. Without it, software would require repetitive copy-pasting and would be difficult to debug.`;
+  }
+
+  return {
+    direct_answer: directAnswer,
+    analogy: lesson.analogy || "Think of an instruction manual where each step must be followed in strict order to achieve the desired result.",
+    code_example: lesson.example || `# Simple demonstration of ${topic}\nx = 10\nprint('Concept in action:', x)`,
+    pro_tip: isTamil 
+      ? "எப்போதும் பெரிய சிக்கல்களை சிறிய துண்டுகளாகப் பிரித்து, எளிய உள்ளீடுகளைக் கொண்டு முதலில் சோதித்து பார்க்கவும்."
+      : "Always test with small, simple inputs first before writing complex logic, and trace state transitions step-by-step."
   };
 }
 
