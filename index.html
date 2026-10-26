@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>OpenLearn AI — Multilingual Adaptive CS Tutor</title>
+  <title>OpenLearn AI — Multilingual Adaptive CS Tutor with Multi-Model AI</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -21,11 +21,11 @@
         <span class="brand-icon">🎓</span>
         <div class="brand-text">
           <span class="brand-title">OpenLearn AI</span>
-          <span class="brand-tag">Multilingual CS Tutor</span>
+          <span class="brand-tag">Multilingual CS Tutor • Multi-Model AI</span>
         </div>
       </div>
 
-      <!-- Gamification HUD -->
+      <!-- Gamification & Status HUD -->
       <div class="hud">
         <div class="hud-item rank-badge" id="hudRank">
           <span class="hud-icon">🌱</span>
@@ -39,38 +39,181 @@
           <span class="hud-icon">🔥</span>
           <span id="streakText">0 Streak</span>
         </div>
-        <div class="hud-item status-badge" id="statusBadge" title="Click to view AI Engine Settings">
-          <span class="status-dot"></span>
-          <span id="statusText">Checking Engine...</span>
+        <div class="hud-item status-badge" id="statusBadge" title="Current AI Engine Status">
+          <span class="status-dot" id="statusDot"></span>
+          <span id="statusText">Checking AI Engines...</span>
         </div>
         <button id="settingsBtn" class="hud-item settings-btn" title="AI Settings & API Keys" type="button">
-          <span>⚙️ Settings</span>
+          <span>⚙️ AI Models & Keys</span>
         </button>
       </div>
     </div>
   </header>
 
-  <!-- Settings Modal (Cloud API Key / Engine Switcher) -->
-  <div id="settingsModal" class="modal hidden">
+  <!-- Settings Modal (AI Providers, API Keys, Ollama & Connection Testing) -->
+  <div id="settingsModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
     <div class="modal-content card">
       <div class="modal-header">
-        <h3>⚙️ AI Engine & Cloud Settings</h3>
-        <button id="closeSettingsBtn" class="close-btn" type="button">&times;</button>
+        <div class="modal-title-wrap">
+          <h3 id="modalTitle">⚙️ AI Model Engines & Cloud Settings</h3>
+          <p class="modal-sub">
+            Link any AI model to OpenLearn AI. Keys are saved securely in your browser's private local storage.
+          </p>
+        </div>
+        <button id="closeSettingsBtn" class="close-btn" type="button" aria-label="Close settings">&times;</button>
       </div>
-      <p class="modal-sub">
-        OpenLearn AI runs seamlessly with local Ollama, Cloud APIs (Groq / Gemini), or 100% offline Client-Side Mode.
-      </p>
-      <div class="form-group">
-        <label for="groqApiKeyInput">Groq Cloud API Key (Optional — for sub-second cloud AI):</label>
-        <input type="password" id="groqApiKeyInput" placeholder="gsk_..." autocomplete="off">
-        <small class="helper-text">Get a free key in 30 seconds at <a href="https://console.groq.com/keys" target="_blank" rel="noopener">console.groq.com</a>.</small>
+
+      <!-- Connection Test Banner -->
+      <div id="connectionFeedback" class="test-feedback-box hidden"></div>
+
+      <div class="provider-list">
+        <!-- Google Gemini Card -->
+        <div class="provider-card">
+          <div class="provider-header">
+            <div class="provider-info">
+              <span class="provider-icon">🌟</span>
+              <strong>Google Gemini</strong>
+              <span class="provider-tag free-tag">Generous Free Tier</span>
+            </div>
+            <button class="btn btn-sm btn-outline test-btn" data-provider="gemini" type="button">🧪 Test Key</button>
+          </div>
+          <p class="provider-desc">
+            Fast, high-quality multimodal reasoning. 
+            <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener" class="helper-link">Get a free key at Google AI Studio &nearr;</a>
+          </p>
+          <div class="provider-inputs">
+            <input type="password" id="geminiApiKeyInput" placeholder="Paste Gemini API Key (AIzaSy...)" autocomplete="off">
+            <select id="geminiModelSelect" class="provider-model-select">
+              <option value="gemini-2.5-flash">Gemini 2.5 Flash (Fastest & Newest)</option>
+              <option value="gemini-1.5-flash" selected>Gemini 1.5 Flash (Standard)</option>
+              <option value="gemini-1.5-pro">Gemini 1.5 Pro (Deep Reasoning)</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Groq Cloud Card -->
+        <div class="provider-card">
+          <div class="provider-header">
+            <div class="provider-info">
+              <span class="provider-icon">⚡</span>
+              <strong>Groq Cloud</strong>
+              <span class="provider-tag fast-tag">Sub-Second Speed</span>
+            </div>
+            <button class="btn btn-sm btn-outline test-btn" data-provider="groq" type="button">🧪 Test Key</button>
+          </div>
+          <p class="provider-desc">
+            Ultra-fast Llama 3.3 inference for instant responses. 
+            <a href="https://console.groq.com/keys" target="_blank" rel="noopener" class="helper-link">Get a free key at Groq Console &nearr;</a>
+          </p>
+          <div class="provider-inputs">
+            <input type="password" id="groqApiKeyInput" placeholder="Paste Groq API Key (gsk_...)" autocomplete="off">
+            <select id="groqModelSelect" class="provider-model-select">
+              <option value="llama-3.3-70b-versatile" selected>Llama 3.3 70B Versatile</option>
+              <option value="llama-3.1-8b-instant">Llama 3.1 8B Instant</option>
+              <option value="mixtral-8x7b-32768">Mixtral 8x7B</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- OpenRouter Card -->
+        <div class="provider-card">
+          <div class="provider-header">
+            <div class="provider-info">
+              <span class="provider-icon">🌐</span>
+              <strong>OpenRouter</strong>
+              <span class="provider-tag multi-tag">DeepSeek, Llama, Qwen</span>
+            </div>
+            <button class="btn btn-sm btn-outline test-btn" data-provider="openrouter" type="button">🧪 Test Key</button>
+          </div>
+          <p class="provider-desc">
+            Unified access to hundreds of open & proprietary models including DeepSeek R1. 
+            <a href="https://openrouter.ai/keys" target="_blank" rel="noopener" class="helper-link">Get key at OpenRouter &nearr;</a>
+          </p>
+          <div class="provider-inputs">
+            <input type="password" id="openrouterApiKeyInput" placeholder="Paste OpenRouter Key (sk-or-...)" autocomplete="off">
+            <select id="openrouterModelSelect" class="provider-model-select">
+              <option value="google/gemini-2.0-flash-exp:free" selected>Gemini 2.0 Flash Exp (Free)</option>
+              <option value="meta-llama/llama-3.3-70b-instruct:free">Llama 3.3 70B Instruct (Free)</option>
+              <option value="deepseek/deepseek-r1:free">DeepSeek R1 (Free)</option>
+              <option value="qwen/qwen-2.5-72b-instruct">Qwen 2.5 72B Instruct</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- OpenAI Card -->
+        <div class="provider-card">
+          <div class="provider-header">
+            <div class="provider-info">
+              <span class="provider-icon">🤖</span>
+              <strong>OpenAI</strong>
+              <span class="provider-tag">GPT-4o & GPT-4o-mini</span>
+            </div>
+            <button class="btn btn-sm btn-outline test-btn" data-provider="openai" type="button">🧪 Test Key</button>
+          </div>
+          <p class="provider-desc">
+            Industry-standard OpenAI GPT models.
+            <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener" class="helper-link">Get key at platform.openai.com &nearr;</a>
+          </p>
+          <div class="provider-inputs">
+            <input type="password" id="openaiApiKeyInput" placeholder="Paste OpenAI Key (sk-...)" autocomplete="off">
+            <select id="openaiModelSelect" class="provider-model-select">
+              <option value="gpt-4o-mini" selected>GPT-4o Mini (Fast & Affordable)</option>
+              <option value="gpt-4o">GPT-4o (Flagship Model)</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- DeepSeek Card -->
+        <div class="provider-card">
+          <div class="provider-header">
+            <div class="provider-info">
+              <span class="provider-icon">🧠</span>
+              <strong>DeepSeek</strong>
+              <span class="provider-tag">DeepSeek-V3 / R1</span>
+            </div>
+            <button class="btn btn-sm btn-outline test-btn" data-provider="deepseek" type="button">🧪 Test Key</button>
+          </div>
+          <p class="provider-desc">
+            DeepSeek's powerful reasoning and coding models.
+            <a href="https://platform.deepseek.com/" target="_blank" rel="noopener" class="helper-link">Get key at platform.deepseek.com &nearr;</a>
+          </p>
+          <div class="provider-inputs">
+            <input type="password" id="deepseekApiKeyInput" placeholder="Paste DeepSeek Key (sk-...)" autocomplete="off">
+            <select id="deepseekModelSelect" class="provider-model-select">
+              <option value="deepseek-chat" selected>DeepSeek V3 (Chat)</option>
+              <option value="deepseek-reasoner">DeepSeek R1 (Reasoner)</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Local Ollama Card -->
+        <div class="provider-card">
+          <div class="provider-header">
+            <div class="provider-info">
+              <span class="provider-icon">💻</span>
+              <strong>Local Ollama</strong>
+              <span class="provider-tag local-tag">100% Offline & Private</span>
+            </div>
+            <button class="btn btn-sm btn-outline test-btn" data-provider="ollama" type="button">🔍 Detect Models</button>
+          </div>
+          <p class="provider-desc">
+            Run open-weight models on your own laptop without any internet connection.
+          </p>
+          <div class="provider-inputs">
+            <input type="text" id="ollamaUrlInput" value="http://localhost:11434" placeholder="http://localhost:11434">
+            <select id="ollamaModelSelect" class="provider-model-select">
+              <option value="llama3.2" selected>llama3.2</option>
+              <option value="llama3.1">llama3.1</option>
+              <option value="qwen2.5">qwen2.5</option>
+              <option value="mistral">mistral</option>
+              <option value="deepseek-r1">deepseek-r1</option>
+            </select>
+          </div>
+        </div>
       </div>
-      <div class="form-group">
-        <label for="ollamaUrlInput">Local Ollama URL:</label>
-        <input type="text" id="ollamaUrlInput" value="http://localhost:11434">
-      </div>
+
       <div class="modal-actions">
-        <button id="saveSettingsBtn" class="btn btn-primary" type="button">Save Settings</button>
+        <button id="saveSettingsBtn" class="btn btn-primary" type="button">💾 Save & Apply Settings</button>
       </div>
     </div>
   </div>
@@ -82,7 +225,7 @@
       <h1 class="hero-title">Master Computer Science in <span class="gradient-text">Your Mother Tongue</span></h1>
       <p class="hero-subtitle">
         Democratizing technical education with everyday cultural analogies, dynamic visual flowcharts, 
-        interactive code playgrounds, and adaptive misconception diagnosis.
+        interactive code playgrounds, and adaptive misconception diagnosis powered by connected AI models.
       </p>
 
       <!-- Quick Topic Chips -->
@@ -94,7 +237,13 @@
           <button class="topic-chip" data-topic="Conditionals (If-Else)">🔀 If-Else</button>
           <button class="topic-chip" data-topic="Functions & Scope">🎯 Functions</button>
           <button class="topic-chip" data-topic="Lists & Arrays">📚 Lists</button>
+          <button class="topic-chip" data-topic="Dictionaries & Hash Maps">🗂️ Dictionaries</button>
           <button class="topic-chip" data-topic="Recursion & Call Stack">🔄 Recursion</button>
+          <button class="topic-chip" data-topic="Object-Oriented Programming (Classes)">🏗️ OOP & Classes</button>
+          <button class="topic-chip" data-topic="Binary Search Algorithm">🔍 Binary Search</button>
+          <button class="topic-chip" data-topic="Big-O Complexity & Algorithms">⚡ Big-O</button>
+          <button class="topic-chip" data-topic="Stacks & Queues">🥞 Stacks & Queues</button>
+          <button class="topic-chip" data-topic="APIs & Web Requests">🌐 APIs & HTTP</button>
         </div>
       </div>
     </section>
@@ -103,8 +252,8 @@
     <section class="card config-card">
       <div class="form-grid">
         <div class="form-group topic-group">
-          <label for="topicInput">Concept or Topic</label>
-          <input type="text" id="topicInput" value="Variables & Memory" placeholder="e.g. Variables, Loops, Binary Search, What is an API...">
+          <label for="topicInput">Concept or Topic to Learn</label>
+          <input type="text" id="topicInput" value="Variables & Memory" placeholder="e.g. Variables, Binary Search, Linked Lists, What is an API, Recursion...">
         </div>
         <div class="form-group">
           <label for="levelSelect">Pedagogy Level</label>
@@ -129,11 +278,13 @@
         <div class="form-group">
           <label for="modelSelect">AI Model Engine</label>
           <select id="modelSelect">
-            <option value="demo">Interactive Mode (Offline & Instant)</option>
-            <option value="groq">Groq Cloud (Llama 3.3 70B - Sub-Second)</option>
-            <option value="llama3.2">Ollama (llama3.2)</option>
-            <option value="llama3.1">Ollama (llama3.1)</option>
-            <option value="qwen2.5">Ollama (qwen2.5)</option>
+            <option value="gemini" selected>🌟 Google Gemini (Gemini 2.5 / 1.5 Flash)</option>
+            <option value="groq">⚡ Groq Cloud (Llama 3.3 70B - Sub-Second)</option>
+            <option value="openrouter">🌐 OpenRouter (DeepSeek R1 / Llama 3.3)</option>
+            <option value="openai">🤖 OpenAI (GPT-4o-mini / GPT-4o)</option>
+            <option value="deepseek">🧠 DeepSeek (DeepSeek V3 / R1)</option>
+            <option value="ollama">💻 Ollama Local (llama3.2, qwen2.5...)</option>
+            <option value="offline">💡 Smart Offline Mode (25+ Topics & Heuristics)</option>
           </select>
         </div>
       </div>
@@ -143,13 +294,14 @@
           <span class="btn-icon">✨</span>
           <span class="btn-text">Start Learning Session</span>
         </button>
+        <span class="active-engine-hint" id="activeEngineHint">Model: Google Gemini</span>
       </div>
     </section>
 
     <!-- Loading State -->
     <div id="loadingIndicator" class="loading-container hidden">
       <div class="spinner"></div>
-      <p id="loadingMsg">Generating personalized lesson, analogy & mental model...</p>
+      <p id="loadingMsg">Synthesizing personalized mental model, analogy & flowchart...</p>
     </div>
 
     <!-- Active Lesson Display -->
@@ -159,6 +311,7 @@
           <span class="badge topic-badge" id="lessonTopicBadge">Variables</span>
           <span class="badge level-badge" id="lessonLevelBadge">Absolute beginner</span>
           <span class="badge lang-badge" id="lessonLangBadge">English</span>
+          <span class="badge model-badge" id="lessonModelBadge">Gemini 1.5 Flash</span>
         </div>
         <div class="lesson-actions">
           <button id="audioBtn" class="btn btn-secondary btn-sm" title="Audio Read-Aloud" type="button">
@@ -184,19 +337,22 @@
         </div>
       </div>
 
-      <!-- Interactive Concept Views (Tabs: Visual Flowchart vs Code Sandbox) -->
+      <!-- Interactive Concept Views (Tabs: Visual Flowchart vs Code Sandbox vs Ask AI Doubt) -->
       <div class="tabs-container">
         <div class="tabs-header">
           <button class="tab-btn active" data-tab="tabDiagram" type="button">📊 Visual Mental Model (Flowchart)</button>
           <button class="tab-btn" data-tab="tabCode" type="button">💻 Live Code Playground</button>
+          <button class="tab-btn doubt-tab-btn" data-tab="tabDoubt" type="button">💬 Ask AI Tutor Any Doubt</button>
         </div>
 
+        <!-- Tab 1: Mermaid Diagram -->
         <div id="tabDiagram" class="tab-content active">
           <div class="diagram-wrapper">
             <div id="mermaidDiagram" class="mermaid-canvas"></div>
           </div>
         </div>
 
+        <!-- Tab 2: Python Sandbox -->
         <div id="tabCode" class="tab-content">
           <div class="code-editor-wrapper">
             <div class="code-header">
@@ -212,8 +368,71 @@
                 <button id="resetCodeBtn" class="btn btn-sm btn-secondary" type="button">↺ Reset</button>
               </div>
               <div class="console-box">
-                <div class="console-label">Output:</div>
+                <div class="console-label">Console Output:</div>
                 <pre id="consoleResult">(Click "Run Code" to execute)</pre>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab 3: Ask AI Tutor Any Doubt (Q&A) -->
+        <div id="tabDoubt" class="tab-content">
+          <div class="doubt-container">
+            <div class="doubt-intro">
+              <h3 class="section-heading">💬 Ask OpenLearn AI Any Doubt</h3>
+              <p class="tab-subtitle">Ask questions about this concept, paste errors, or request alternative examples in your language.</p>
+            </div>
+
+            <!-- Quick Suggestion Chips -->
+            <div class="doubt-suggestions">
+              <span class="doubt-suggest-label">Ideas to ask:</span>
+              <button class="suggest-chip" data-q="Can you explain this with a real-life cooking or sports analogy?">💡 Daily-life analogy</button>
+              <button class="suggest-chip" data-q="What is the most common mistake beginners make with this?">⚡ Common mistakes</button>
+              <button class="suggest-chip" data-q="Can you explain line-by-line how the code works?">🔍 Line-by-line explanation</button>
+              <button class="suggest-chip" data-q="Why do we need this instead of simpler alternatives?">❓ Why use this?</button>
+            </div>
+
+            <div class="doubt-input-wrapper">
+              <div class="form-group">
+                <label for="doubtQueryInput">Your Question or Confusion:</label>
+                <input type="text" id="doubtQueryInput" placeholder="e.g. Why is a loop condition needed? How does memory work here?">
+              </div>
+              <div class="form-group">
+                <label for="doubtCodeInput">Optional Code or Error Snippet:</label>
+                <textarea id="doubtCodeInput" rows="2" placeholder="Paste your code or error message if relevant..."></textarea>
+              </div>
+              <button id="askDoubtBtn" class="btn btn-primary" type="button">
+                <span>💡 Ask AI Tutor</span>
+              </button>
+            </div>
+
+            <!-- Doubt Answer Box -->
+            <div id="doubtAnswerContainer" class="doubt-answer-box hidden">
+              <div class="doubt-answer-header">
+                <h4>🎯 OpenLearn AI Explanation</h4>
+                <button id="doubtAudioBtn" class="btn btn-secondary btn-sm" type="button">
+                  <span id="doubtAudioIcon">🔊</span>
+                  <span>Read Aloud</span>
+                </button>
+              </div>
+              <div id="doubtDirectAnswer" class="rich-text"></div>
+              
+              <div id="doubtAnalogyCard" class="callout analogy-callout hidden">
+                <div class="callout-header"><strong>🏠 Relatable Analogy:</strong></div>
+                <div id="doubtAnalogyText" class="callout-text"></div>
+              </div>
+
+              <div id="doubtCodeCard" class="code-preview-block hidden">
+                <div class="code-header">
+                  <span>Demonstration Code</span>
+                  <button id="copyDoubtCodeBtn" class="copy-btn" type="button">📋 Copy</button>
+                </div>
+                <pre><code id="doubtCodeSnippet"></code></pre>
+              </div>
+
+              <div id="doubtProTipCard" class="callout misconception-callout hidden">
+                <div class="callout-header"><strong>⚡ Key Pro Tip:</strong></div>
+                <div id="doubtProTipText" class="callout-text"></div>
               </div>
             </div>
           </div>
@@ -293,7 +512,7 @@
   <footer class="footer">
     <div class="footer-container">
       <span>OpenLearn AI • 100% Open-Source Multilingual CS Tutor</span>
-      <span>Deployable on GitHub Pages, Render, Hugging Face & Ollama</span>
+      <span>Supports Google Gemini, Groq, OpenRouter, OpenAI, DeepSeek & Ollama</span>
     </div>
   </footer>
 

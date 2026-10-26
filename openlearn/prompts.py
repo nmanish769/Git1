@@ -1,18 +1,20 @@
 """Teaching prompts for OpenLearn AI.
 
 Designed to generate structured JSON with explanations, analogies,
-interactive code examples, Mermaid.js visual diagrams, and adaptive feedback.
+interactive code examples, Mermaid.js visual diagrams, adaptive feedback,
+and step-by-step doubt resolution for students.
 """
 
 from .languages import LANGUAGES
 from .levels import LEVELS
 
 SYSTEM = (
-    "You are a friendly, world-class computer science educator and mentor for beginners. "
-    "You explain concepts with intuitive mental models, celebrate effort, never shame mistakes, "
-    "and guide learners toward deep understanding. "
+    "You are OpenLearn AI, a warm, patient, world-class computer science educator and mentor. "
+    "Your goal is to make every student understand technical concepts deeply using intuitive mental models, "
+    "everyday cultural analogies, clear runnable code, and visual flowcharts. "
+    "Always celebrate curiosity and effort, explain the 'why' behind concepts, and never shame confusion. "
     "CRITICAL REQUIREMENT: You MUST respond with ONLY a single valid, parseable JSON object. "
-    "Never add markdown backticks outside the JSON or text outside the curly braces."
+    "Do NOT include markdown backticks or any conversational text outside the JSON structure."
 )
 
 
@@ -60,4 +62,28 @@ Return a valid JSON object with EXACTLY these keys:
   "revised_explanation": "If next_step is re_explain: provide a fresh, alternative explanation using a completely different angle or metaphor. Otherwise empty string.",
   "next_question": "An adaptive next question (slightly higher difficulty if correct, a simplified retry if incorrect)",
   "study_next": "One clear, actionable concept or sub-topic to explore next"
+}}"""
+
+
+def doubt_prompt(topic: str, level: str, language: str, student_question: str, code_context: str = "") -> str:
+    """Prompt for answering ANY custom student question, doubt, bug, or homework confusion."""
+    lang_instruction = LANGUAGES.get(language, LANGUAGES["English"])
+    level_instruction = LEVELS.get(level, LEVELS["Beginner"])
+
+    context_str = f"\nRelevant Code / Context provided by student:\n```python\n{code_context}\n```" if code_context else ""
+
+    return f"""A student studying "{topic}" ({level}) has asked a question/doubt:
+Student's Question: "{student_question}"{context_str}
+
+Language Instruction: {lang_instruction}
+Pedagogical guidance: {level_instruction}
+
+Answer the student's question clearly, warmly, and accurately.
+Return a valid JSON object with EXACTLY these keys:
+{{
+  "direct_answer": "Clear, direct, and accessible explanation answering the student's doubt (100-150 words)",
+  "analogy": "A memorable real-world analogy to help the concept stick",
+  "code_example": "A short, clean code snippet illustrating the solution or explanation (under 8 lines)",
+  "pro_tip": "One key tip, common beginner mistake to avoid, or best practice related to this question",
+  "diagram": "A simple 3-4 line Mermaid flowchart if helpful, or empty string"
 }}"""

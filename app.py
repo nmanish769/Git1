@@ -266,7 +266,7 @@ if S.lesson:
     st.markdown("---")
     st.markdown(f"### 📖 Concept: **{S.topic_used}** `({S.level_used})`")
 
-    tab_learn, tab_visual, tab_playground = st.tabs(["📚 Intuitive Concept", "📊 Visual Flowchart", "💻 Code Sandbox"])
+    tab_learn, tab_visual, tab_playground, tab_doubt = st.tabs(["📚 Intuitive Concept", "📊 Visual Flowchart", "💻 Code Sandbox", "💬 Ask AI Doubt"])
 
     with tab_learn:
         st.markdown(f"#### 💡 Core Idea")
@@ -313,6 +313,29 @@ if S.lesson:
             output = run_python_code(code_input)
             st.markdown("**Console Output:**")
             st.code(output, language="text")
+
+    with tab_doubt:
+        st.markdown("#### 💬 Ask AI Tutor Any Doubt")
+        st.caption("Ask questions about this concept, paste errors, or request alternative examples in your language.")
+        doubt_q = st.text_input("Your Question / Doubt", placeholder="e.g. Why is a loop condition needed? How does memory work here?", key="doubt_query_input")
+        doubt_code = st.text_area("Optional Code / Error snippet", placeholder="Paste your code or error here if relevant...", height=80, key="doubt_code_input")
+
+        if st.button("💡 Ask AI Tutor", type="primary", disabled=not doubt_q.strip()):
+            with st.spinner("AI Tutor is preparing your explanation..."):
+                try:
+                    d_prompt = prompts.doubt_prompt(S.topic_used, S.level_used, S.lang_used, doubt_q.strip(), doubt_code.strip())
+                    doubt_ans = call_llm(prompts.SYSTEM, d_prompt)
+                    st.markdown("##### 💡 Explanation")
+                    st.write(doubt_ans.get("direct_answer", ""))
+                    if doubt_ans.get("analogy"):
+                        st.info(f"**🏠 Analogy:** {doubt_ans['analogy']}")
+                    if doubt_ans.get("code_example"):
+                        st.markdown("**💻 Code Example:**")
+                        st.code(doubt_ans["code_example"], language="python")
+                    if doubt_ans.get("pro_tip"):
+                        st.success(f"**⚡ Pro Tip:** {doubt_ans['pro_tip']}")
+                except llm.LLMError as e:
+                    st.error(f"❌ {e}")
 
     # ---------- Adaptive Assessment & Diagnosis ----------
     st.markdown("---")

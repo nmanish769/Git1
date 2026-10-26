@@ -1,6 +1,12 @@
 """FastAPI Backend Server for OpenLearn AI.
-Serves the modern frontend and provides REST endpoints for LLM lessons,
-misconception diagnosis, code sandbox execution, and model detection.
+
+Provides REST endpoints for:
+- Multi-Model LLM lesson generation (Gemini, Groq, OpenRouter, OpenAI, DeepSeek, Ollama, Offline).
+- Intelligent misconception diagnosis & practice evaluation.
+- Real-time student doubt answering & code explanation.
+- Model connectivity testing.
+- Sandboxed Python code execution.
+- Serving modern Single-Page Application frontend.
 """
 
 import contextlib
@@ -27,8 +33,8 @@ from openlearn.levels import LEVELS
 
 app = FastAPI(
     title="OpenLearn AI API",
-    description="Backend for Autonomous Multilingual CS Tutor",
-    version="2.0.0",
+    description="Autonomous Multilingual Computer Science Tutor Backend with Multi-Model AI Linking",
+    version="2.5.0",
 )
 
 # Enable CORS for cross-origin access (e.g. GitHub Pages or local testing)
@@ -40,7 +46,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Mount static directory
+# Mount static directory if present
 STATIC_DIR = CURRENT_DIR / "static"
 if not STATIC_DIR.exists():
     STATIC_DIR.mkdir(parents=True, exist_ok=True)
@@ -53,9 +59,9 @@ class LessonRequest(BaseModel):
     topic: str
     level: str = "Beginner"
     language: str = "English"
-    backend: Optional[str] = "Ollama (Local Open-Weight Models)"
-    base_url: Optional[str] = "http://localhost:11434"
-    model: Optional[str] = "llama3.2"
+    backend: Optional[str] = "Google Gemini"
+    base_url: Optional[str] = ""
+    model: Optional[str] = "gemini-1.5-flash"
     api_key: Optional[str] = ""
 
 
@@ -66,10 +72,29 @@ class FeedbackRequest(BaseModel):
     lesson: Dict[str, Any]
     question: str
     answer: str
-    backend: Optional[str] = "Ollama (Local Open-Weight Models)"
-    base_url: Optional[str] = "http://localhost:11434"
-    model: Optional[str] = "llama3.2"
+    backend: Optional[str] = "Google Gemini"
+    base_url: Optional[str] = ""
+    model: Optional[str] = "gemini-1.5-flash"
     api_key: Optional[str] = ""
+
+
+class DoubtRequest(BaseModel):
+    topic: str
+    level: str = "Beginner"
+    language: str = "English"
+    question: str
+    code_context: Optional[str] = ""
+    backend: Optional[str] = "Google Gemini"
+    base_url: Optional[str] = ""
+    model: Optional[str] = "gemini-1.5-flash"
+    api_key: Optional[str] = ""
+
+
+class TestConnectionRequest(BaseModel):
+    backend: str
+    api_key: Optional[str] = ""
+    base_url: Optional[str] = ""
+    model: Optional[str] = ""
 
 
 class CodeRunRequest(BaseModel):
@@ -79,18 +104,18 @@ class CodeRunRequest(BaseModel):
 # ---------- API Endpoints ----------
 @app.get("/health")
 def health():
-    return {"status": "ok", "app": "OpenLearn AI"}
+    return {"status": "ok", "app": "OpenLearn AI", "version": "2.5.0"}
 
 
 @app.get("/api/status")
 def get_status():
-    """Check backend health and detected Ollama models."""
+    """Check backend health, detected Ollama models, and configured backends."""
     ollama_models = llm.get_installed_ollama_models()
     return {
         "status": "online",
         "backends": list(llm.BACKENDS.keys()),
         "ollama_models": ollama_models,
-        "default_backend": list(llm.BACKENDS.keys())[0],
+        "default_backend": "Google Gemini",
     }
 
 
@@ -106,20 +131,24 @@ def get_options():
             {"id": "branch", "icon": "🔀", "name": "Conditionals (If-Else)"},
             {"id": "funcs", "icon": "🎯", "name": "Functions & Scope"},
             {"id": "lists", "icon": "📚", "name": "Lists & Arrays"},
-            {"id": "recur", "icon": "🔄", "name": "Recursion & Stack"},
+            {"id": "dicts", "icon": "🗂️", "name": "Dictionaries & Maps"},
+            {"id": "recur", "icon": "🔄", "name": "Recursion & Call Stack"},
+            {"id": "oop", "icon": "🏗️", "name": "Object-Oriented (Classes)"},
+            {"id": "search", "icon": "🔍", "name": "Binary Search"},
+            {"id": "bigo", "icon": "⚡", "name": "Big-O Complexity"},
         ],
     }
 
 
 @app.post("/api/lesson")
 def generate_lesson(req: LessonRequest):
-    """Generates an intuitive lesson with real-world analogy and Mermaid diagram."""
+    """Generates an intuitive lesson with real-world analogy, Python code, and Mermaid diagram."""
     if not req.topic.strip():
         raise HTTPException(status_code=400, detail="Topic cannot be empty.")
 
-    backend_name = req.backend or list(llm.BACKENDS.keys())[0]
-    base_url = req.base_url or "http://localhost:11434"
-    model = req.model or "llama3.2"
+    backend_name = req.backend or "Google Gemini"
+    base_url = req.base_url or ""
+    model = req.model or ""
 
     try:
         user_prompt = prompts.lesson_prompt(req.topic.strip(), req.level, req.language)
@@ -144,9 +173,9 @@ def evaluate_feedback(req: FeedbackRequest):
     if not req.answer.strip():
         raise HTTPException(status_code=400, detail="Answer cannot be empty.")
 
-    backend_name = req.backend or list(llm.BACKENDS.keys())[0]
-    base_url = req.base_url or "http://localhost:11434"
-    model = req.model or "llama3.2"
+    backend_name = req.backend or "Google Gemini"
+    base_url = req.base_url or ""
+    model = req.model or ""
 
     try:
         user_prompt = prompts.feedback_prompt(
@@ -165,6 +194,47 @@ def evaluate_feedback(req: FeedbackRequest):
         raise HTTPException(status_code=500, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Unexpected server error: {e}")
+
+
+@app.post("/api/ask")
+def answer_student_doubt(req: DoubtRequest):
+    """Answers any custom student question, confusion, or doubt about a concept or code."""
+    if not req.question.strip():
+        raise HTTPException(status_code=400, detail="Question cannot be empty.")
+
+    backend_name = req.backend or "Google Gemini"
+    base_url = req.base_url or ""
+    model = req.model or ""
+
+    try:
+        user_prompt = prompts.doubt_prompt(
+            req.topic, req.level, req.language, req.question.strip(), req.code_context or ""
+        )
+        result = llm.ask_json(
+            backend_name,
+            base_url,
+            model,
+            prompts.SYSTEM,
+            user_prompt,
+            api_key=req.api_key or "",
+        )
+        return {"success": True, "answer": result}
+    except llm.LLMError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Unexpected server error: {e}")
+
+
+@app.post("/api/test-connection")
+def test_connection(req: TestConnectionRequest):
+    """Tests connection to a specified AI provider."""
+    result = llm.test_model_connection(
+        req.backend,
+        api_key=req.api_key or "",
+        base_url=req.base_url or "",
+        model=req.model or "",
+    )
+    return result
 
 
 @app.post("/api/run-code")
@@ -224,8 +294,16 @@ def serve_css():
     return FileResponse(css_file, media_type="text/css")
 
 
+@app.get("/script.js")
+def serve_script():
+    js_file = CURRENT_DIR / "script.js"
+    if not js_file.exists():
+        js_file = STATIC_DIR / "script.js"
+    return FileResponse(js_file, media_type="application/javascript")
+
+
 @app.get("/app.js")
-def serve_js():
+def serve_app_js():
     js_file = CURRENT_DIR / "app.js"
     if not js_file.exists():
         js_file = STATIC_DIR / "app.js"
