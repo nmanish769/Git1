@@ -67,6 +67,31 @@
       <div id="connectionFeedback" class="test-feedback-box hidden"></div>
 
       <div class="provider-list">
+        <!-- Backend Server Engine Selection -->
+        <div class="provider-card" style="border-color: rgba(99, 102, 241, 0.45); background: rgba(30, 41, 59, 0.45);">
+          <div class="provider-header">
+            <div class="provider-info">
+              <span class="provider-icon">🖥️</span>
+              <strong>Backend Server Engine</strong>
+              <span class="provider-tag" id="backendEngineTag">Auto-Detect</span>
+            </div>
+            <button class="btn btn-sm btn-outline test-btn" data-provider="backend_server" type="button">🔄 Check Server</button>
+          </div>
+          <p class="provider-desc">
+            Choose the server engine to handle AI routing, code execution, and <code>/api/chat</code> endpoints.
+          </p>
+          <div class="provider-inputs">
+            <select id="backendEngineSelect" class="provider-model-select">
+              <option value="auto" selected>Auto-Detect (Current Host / Local Server)</option>
+              <option value="fastapi">Python FastAPI Server (http://localhost:8000)</option>
+              <option value="express">Node.js Express Server (http://localhost:3000)</option>
+              <option value="browser">Direct Browser Mode (No Server Required / Cloud API)</option>
+              <option value="custom">Custom Server URL</option>
+            </select>
+            <input type="text" id="customBackendUrlInput" placeholder="http://localhost:8000" class="hidden" style="margin-top: 0.5rem;" autocomplete="off">
+          </div>
+        </div>
+
         <!-- Google Gemini Card -->
         <div class="provider-card">
           <div class="provider-header">

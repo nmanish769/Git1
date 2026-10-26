@@ -49,6 +49,10 @@ const state = {
   ollamaUrl: localStorage.getItem('openlearn_ollama_url') || 'http://localhost:11434',
   ollamaModel: localStorage.getItem('openlearn_ollama_model') || 'llama3.2',
   
+  backendEngine: localStorage.getItem('openlearn_backend_engine') || 'auto',
+  customBackendUrl: localStorage.getItem('openlearn_custom_backend_url') || '',
+  activeBackendUrl: null,
+  
   activeEngine: localStorage.getItem('openlearn_active_engine') || 'gemini',
 };
 
@@ -63,6 +67,11 @@ const DOM = {
   closeSettingsBtn: document.getElementById('closeSettingsBtn'),
   saveSettingsBtn: document.getElementById('saveSettingsBtn'),
   connectionFeedback: document.getElementById('connectionFeedback'),
+
+  // Backend Engine Selectors
+  backendEngineSelect: document.getElementById('backendEngineSelect'),
+  customBackendUrlInput: document.getElementById('customBackendUrlInput'),
+  backendEngineTag: document.getElementById('backendEngineTag'),
 
   rankText: document.getElementById('rankText'),
   xpText: document.getElementById('xpText'),
@@ -393,6 +402,15 @@ function initSavedSettings() {
   if (DOM.ollamaUrlInput) DOM.ollamaUrlInput.value = state.ollamaUrl;
   if (DOM.ollamaModelSelect) DOM.ollamaModelSelect.value = state.ollamaModel;
 
+  // Set Backend Server Engine settings
+  if (DOM.backendEngineSelect) {
+    DOM.backendEngineSelect.value = state.backendEngine;
+  }
+  if (DOM.customBackendUrlInput) {
+    DOM.customBackendUrlInput.value = state.customBackendUrl;
+    DOM.customBackendUrlInput.classList.toggle('hidden', state.backendEngine !== 'custom');
+  }
+
   // Set active model select
   if (DOM.modelSelect) {
     DOM.modelSelect.value = state.activeEngine;
@@ -400,25 +418,59 @@ function initSavedSettings() {
   }
 }
 
+function getEffectiveBackendUrl() {
+  if (state.backendEngine === 'fastapi') return 'http://localhost:8000';
+  if (state.backendEngine === 'express') return 'http://localhost:3000';
+  if (state.backendEngine === 'browser') return null;
+  if (state.backendEngine === 'custom' && state.customBackendUrl) return state.customBackendUrl.replace(/\/$/, '');
+  // Auto mode: if hosted with backend origin, use origin
+  if (window.location.protocol.startsWith('http') && !window.location.hostname.includes('github.io')) {
+    return window.location.origin;
+  }
+  return null;
+}
+
 async function checkBackendHealth() {
-  try {
-    const res = await fetch('/api/status', { method: 'GET' });
-    if (res.ok) {
-      const data = await res.json();
-      state.backendConnected = true;
-      DOM.statusText.textContent = '🟢 Server Connected';
-      DOM.statusBadge.classList.add('connected');
-      DOM.statusDot.style.backgroundColor = '#10b981';
-      return;
-    }
-  } catch (e) {
-    // Running in standalone browser / GitHub Pages
+  if (state.backendEngine === 'browser') {
+    state.backendConnected = false;
+    state.activeBackendUrl = null;
+    DOM.statusText.textContent = '🌐 Direct Browser Mode';
+    DOM.statusDot.style.backgroundColor = '#06b6d4';
+    if (DOM.backendEngineTag) DOM.backendEngineTag.textContent = 'Direct Browser';
+    return;
+  }
+
+  const candidateUrls = [];
+  const configured = getEffectiveBackendUrl();
+  if (configured) candidateUrls.push(configured);
+  if (state.backendEngine === 'auto') {
+    candidateUrls.push('http://localhost:8000');
+    candidateUrls.push('http://localhost:3000');
+  }
+
+  for (const url of candidateUrls) {
+    try {
+      const res = await fetch(`${url}/api/status`, { method: 'GET' });
+      if (res.ok) {
+        state.backendConnected = true;
+        state.activeBackendUrl = url;
+        const isFastAPI = url.includes(':8000');
+        const isExpress = url.includes(':3000');
+        const tag = isFastAPI ? 'FastAPI (:8000)' : isExpress ? 'Express (:3000)' : 'Server Online';
+        DOM.statusText.textContent = `🟢 ${tag}`;
+        DOM.statusDot.style.backgroundColor = '#10b981';
+        if (DOM.backendEngineTag) DOM.backendEngineTag.textContent = tag;
+        return;
+      }
+    } catch (_) {}
   }
 
   state.backendConnected = false;
+  state.activeBackendUrl = null;
   DOM.statusText.textContent = '🌐 Direct Browser Mode';
   DOM.statusBadge.classList.add('connected');
   DOM.statusDot.style.backgroundColor = '#06b6d4';
+  if (DOM.backendEngineTag) DOM.backendEngineTag.textContent = 'Direct Browser';
 }
 
 function updateActiveEngineHint() {
@@ -459,6 +511,16 @@ function initEventListeners() {
   });
 
   DOM.saveSettingsBtn.addEventListener('click', handleSaveSettings);
+
+  // Backend Engine Select Change
+  if (DOM.backendEngineSelect) {
+    DOM.backendEngineSelect.addEventListener('change', () => {
+      const mode = DOM.backendEngineSelect.value;
+      if (DOM.customBackendUrlInput) {
+        DOM.customBackendUrlInput.classList.toggle('hidden', mode !== 'custom');
+      }
+    });
+  }
 
   // Model Engine Dropdown Change
   DOM.modelSelect.addEventListener('change', () => {
@@ -566,6 +628,17 @@ function handleSaveSettings() {
   localStorage.setItem('openlearn_ollama_url', state.ollamaUrl);
   localStorage.setItem('openlearn_ollama_model', state.ollamaModel);
 
+  // Save backend engine choice
+  if (DOM.backendEngineSelect) {
+    state.backendEngine = DOM.backendEngineSelect.value;
+    localStorage.setItem('openlearn_backend_engine', state.backendEngine);
+  }
+  if (DOM.customBackendUrlInput) {
+    state.customBackendUrl = DOM.customBackendUrlInput.value.trim();
+    localStorage.setItem('openlearn_custom_backend_url', state.customBackendUrl);
+  }
+  checkBackendHealth();
+
   // Auto-switch to model with key if current is empty
   if (state.geminiKey && state.activeEngine === 'offline') {
     state.activeEngine = 'gemini';
@@ -593,7 +666,26 @@ async function handleTestConnection(provider) {
     let testSuccess = false;
     let testMessage = '';
 
-    if (provider === 'gemini') {
+    if (provider === 'backend_server') {
+      const mode = DOM.backendEngineSelect ? DOM.backendEngineSelect.value : 'auto';
+      if (mode === 'browser') {
+        testSuccess = true;
+        testMessage = 'Direct Browser Mode: calls AI APIs directly from your browser. No server process required!';
+      } else {
+        const candidate = mode === 'fastapi' ? 'http://localhost:8000' :
+                          mode === 'express' ? 'http://localhost:3000' :
+                          mode === 'custom' ? (DOM.customBackendUrlInput.value.trim() || 'http://localhost:8000') :
+                          (window.location.protocol.startsWith('http') && !window.location.hostname.includes('github.io') ? window.location.origin : 'http://localhost:8000');
+        const res = await fetch(`${candidate.replace(/\/$/, '')}/api/status`).catch(() => null);
+        if (res && res.ok) {
+          const data = await res.json();
+          testSuccess = true;
+          testMessage = `Successfully connected to backend server at ${candidate}! Status: ${data.status || 'online'}`;
+        } else {
+          throw new Error(`Could not reach backend at ${candidate}. Start server with 'py server.py' (FastAPI on :8000) or 'npm start' (Express on :3000).`);
+        }
+      }
+    } else if (provider === 'gemini') {
       key = DOM.geminiApiKeyInput.value.trim();
       model = DOM.geminiModelSelect.value;
       if (!key) throw new Error('Please paste your Gemini API key first.');
