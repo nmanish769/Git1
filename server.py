@@ -16,6 +16,11 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, Optional
 
+try:
+    import requests
+except ImportError:
+    requests = None
+
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
@@ -99,6 +104,10 @@ class TestConnectionRequest(BaseModel):
 
 class CodeRunRequest(BaseModel):
     code: str
+
+
+class ChatRequest(BaseModel):
+    question: str
 
 
 # ---------- API Endpoints ----------
@@ -223,6 +232,59 @@ def answer_student_doubt(req: DoubtRequest):
         raise HTTPException(status_code=500, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Unexpected server error: {e}")
+
+
+@app.post("/api/chat")
+def chat_with_ollama(req: ChatRequest):
+    """Direct chat endpoint matching Express /api/chat. Calls local Ollama (llama3.2) or smart fallback.
+    Returns JSON: {"answer": "..."}
+    """
+    if not req.question or not req.question.strip():
+        return {"answer": "Please provide a question."}
+
+    ollama_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+    model = os.getenv("OLLAMA_MODEL", "llama3.2")
+
+    # 1. Attempt to query local Ollama instance
+    if requests is not None:
+        try:
+            r = requests.post(
+                f"{ollama_url.rstrip('/')}/api/chat",
+                json={
+                    "model": model,
+                    "messages": [{"role": "user", "content": req.question.strip()}],
+                    "stream": False,
+                },
+                timeout=(3.0, 30.0),
+            )
+            if r.ok:
+                data = r.json()
+                content = data.get("message", {}).get("content", "")
+                if content:
+                    return {"answer": content}
+        except Exception:
+            pass
+
+    # 2. If Ollama is offline or not installed, provide intelligent OpenLearn AI response
+    try:
+        from openlearn.mock_data import get_offline_doubt_answer
+        doubt_res = get_offline_doubt_answer("Computer Science", req.question.strip(), "")
+        ans = doubt_res.get("direct_answer", "")
+        analogy = doubt_res.get("analogy", "")
+        pro_tip = doubt_res.get("pro_tip", "")
+
+        out = f"[Ollama at {ollama_url} is currently offline. OpenLearn AI Response]:\n\n{ans}"
+        if analogy:
+            out += f"\n\n🏠 Relatable Analogy: {analogy}"
+        if pro_tip:
+            out += f"\n\n💡 Pro Tip: {pro_tip}"
+        return {"answer": out}
+    except Exception:
+        pass
+
+    return {
+        "answer": f"Could not connect to Ollama at {ollama_url}. Make sure Ollama is running locally with 'ollama run {model}'."
+    }
 
 
 @app.post("/api/test-connection")

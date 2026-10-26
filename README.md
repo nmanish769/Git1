@@ -30,27 +30,35 @@ Anyone can open and interact with the live website directly in their browser:
 
 ## 🚀 Quick Start (Run Locally on Windows/Mac/Linux)
 
-### 1. Launch with One Click (Windows)
-Double-click **`run_web.bat`** in the repository root.
-
-### 2. Or Run via Terminal / PowerShell
+### Option 1: Python Full-Stack Backend (FastAPI on Port 8000)
 ```bash
-# Install dependencies
+# 1. Install dependencies
 pip install -r requirements.txt
 
-# Start Full-Stack Server (FastAPI + Modern Web App)
+# 2. Start Full-Stack Server
 py server.py
 # (Or: python server.py)
 ```
-Automatically serves the application at **`http://localhost:8000`**!
+Serves the web application at **`http://localhost:8000`** with full multi-model support and `/api/chat`.
 
-### 3. Optional: Local Open-Weight AI (Ollama)
+### Option 2: Node.js Express Backend (Express on Port 3000)
+```bash
+# 1. Install dependencies
+npm install
+
+# 2. Start Express Server
+npm start
+```
+Serves the web application at **`http://localhost:3000`** with the `/api/chat` Ollama endpoint.
+
+### Option 3: Local Open-Weight AI (Ollama)
 If you want to run fully offline on your machine without internet:
 ```bash
 ollama pull llama3.2
 # Or for multilingual coding:
 ollama pull qwen2.5
 ```
+Then use the **Instant Ollama AI Chat** card directly in the web app!
 
 ---
 
@@ -96,7 +104,9 @@ Git1/
 ├── style.css                 # Glassmorphic responsive dark-mode styling
 ├── script.js                 # Multi-model AI client engine & state manager
 ├── app.js                    # Redundant mirror of script.js for legacy runners
-├── server.py                 # FastAPI backend server with REST API
+├── server.py                 # FastAPI Python backend (Port 8000) with /api/chat & multi-model AI
+├── server.js                 # Express Node.js backend (Port 3000) with /api/chat for Ollama
+├── package.json              # Node.js project manifest & start script
 ├── main.py                   # Local launcher with auto-browser opening
 ├── app.py                    # Streamlit alternate UI
 ├── push_to_github.bat        # 1-Click push script to update GitHub & GitHub Pages

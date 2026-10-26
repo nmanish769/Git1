@@ -298,6 +298,29 @@
       </div>
     </section>
 
+    <!-- Instant Local Ollama AI Chat Section -->
+    <section class="card ollama-card" id="ollamaChatSection">
+      <div class="ollama-card-header">
+        <div class="ollama-card-title">
+          <span class="ollama-badge-icon">🦙</span>
+          <div>
+            <h3 class="ollama-heading">Instant Ollama AI Chat</h3>
+            <p class="ollama-subheading">Ask questions directly to local Llama 3.2 via <code>POST /api/chat</code></p>
+          </div>
+        </div>
+        <span class="provider-tag local-tag">llama3.2 :11434</span>
+      </div>
+
+      <div class="ollama-chat-body">
+        <textarea id="question" rows="3" placeholder="Ask Ollama..."></textarea>
+        <div class="ollama-action-row">
+          <button class="btn btn-primary" onclick="askOllama()">Send</button>
+          <span class="ollama-status-tip">Calls <code>/api/chat</code> endpoint</span>
+        </div>
+        <p id="answer"></p>
+      </div>
+    </section>
+
     <!-- Loading State -->
     <div id="loadingIndicator" class="loading-container hidden">
       <div class="spinner"></div>
@@ -517,5 +540,26 @@
   </footer>
 
   <script src="script.js"></script>
+  <script>
+  async function askOllama() {
+    const question = document.getElementById("question").value;
+    const answerBox = document.getElementById("answer");
+
+    answerBox.textContent = "Thinking...";
+
+    try {
+      const response = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ question })
+      });
+
+      const data = await response.json();
+      answerBox.textContent = data.answer;
+    } catch (error) {
+      answerBox.textContent = "Could not connect to Ollama.";
+    }
+  }
+  </script>
 </body>
 </html>

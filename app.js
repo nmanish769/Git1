@@ -1573,3 +1573,49 @@ function showLoading(show, message = 'Processing...') {
   DOM.loadingMsg.textContent = message;
   DOM.loadingIndicator.classList.toggle('hidden', !show);
 }
+
+// ---------- Instant Ollama Local Chat ----------
+async function askOllama() {
+  const questionElem = document.getElementById("question");
+  const answerBox = document.getElementById("answer");
+  if (!questionElem || !answerBox) return;
+
+  const question = questionElem.value;
+  if (!question || !question.trim()) {
+    answerBox.textContent = "Please enter a question for Ollama.";
+    return;
+  }
+
+  answerBox.textContent = "Thinking...";
+
+  try {
+    let response = await fetch("/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ question })
+    });
+
+    // If running from static GitHub Pages or port 5500, fallback to local backend on 3000 or 8000
+    if (!response.ok && (window.location.protocol === "file:" || window.location.hostname.includes("github.io"))) {
+      for (const fallbackUrl of ["http://localhost:3000/api/chat", "http://localhost:8000/api/chat"]) {
+        try {
+          const fbRes = await fetch(fallbackUrl, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ question })
+          });
+          if (fbRes.ok) {
+            response = fbRes;
+            break;
+          }
+        } catch (_) {}
+      }
+    }
+
+    const data = await response.json();
+    answerBox.textContent = data.answer || "No response content received.";
+  } catch (error) {
+    answerBox.textContent = "Could not connect to Ollama. Make sure your backend (server.js on :3000 or server.py on :8000) or local Ollama is running.";
+  }
+}
+window.askOllama = askOllama;
