@@ -67,6 +67,31 @@
       <div id="connectionFeedback" class="test-feedback-box hidden"></div>
 
       <div class="provider-list">
+        <!-- Backend Server Engine Selection -->
+        <div class="provider-card" style="border-color: rgba(99, 102, 241, 0.45); background: rgba(30, 41, 59, 0.45);">
+          <div class="provider-header">
+            <div class="provider-info">
+              <span class="provider-icon">🖥️</span>
+              <strong>Backend Server Engine</strong>
+              <span class="provider-tag" id="backendEngineTag">Auto-Detect</span>
+            </div>
+            <button class="btn btn-sm btn-outline test-btn" data-provider="backend_server" type="button">🔄 Check Server</button>
+          </div>
+          <p class="provider-desc">
+            Choose the server engine to handle AI routing, code execution, and <code>/api/chat</code> endpoints.
+          </p>
+          <div class="provider-inputs">
+            <select id="backendEngineSelect" class="provider-model-select">
+              <option value="auto" selected>Auto-Detect (Current Host / Local Server)</option>
+              <option value="fastapi">Python FastAPI Server (http://localhost:8000)</option>
+              <option value="express">Node.js Express Server (http://localhost:3000)</option>
+              <option value="browser">Direct Browser Mode (No Server Required / Cloud API)</option>
+              <option value="custom">Custom Server URL</option>
+            </select>
+            <input type="text" id="customBackendUrlInput" placeholder="http://localhost:8000" class="hidden" style="margin-top: 0.5rem;" autocomplete="off">
+          </div>
+        </div>
+
         <!-- Google Gemini Card -->
         <div class="provider-card">
           <div class="provider-header">
@@ -298,6 +323,29 @@
       </div>
     </section>
 
+    <!-- Instant Local Ollama AI Chat Section -->
+    <section class="card ollama-card" id="ollamaChatSection">
+      <div class="ollama-card-header">
+        <div class="ollama-card-title">
+          <span class="ollama-badge-icon">🦙</span>
+          <div>
+            <h3 class="ollama-heading">Instant Ollama AI Chat</h3>
+            <p class="ollama-subheading">Ask questions directly to local Llama 3.2 via <code>POST /api/chat</code></p>
+          </div>
+        </div>
+        <span class="provider-tag local-tag">llama3.2 :11434</span>
+      </div>
+
+      <div class="ollama-chat-body">
+        <textarea id="question" rows="3" placeholder="Ask Ollama..."></textarea>
+        <div class="ollama-action-row">
+          <button class="btn btn-primary" onclick="askOllama()">Send</button>
+          <span class="ollama-status-tip">Calls <code>/api/chat</code> endpoint</span>
+        </div>
+        <p id="answer"></p>
+      </div>
+    </section>
+
     <!-- Loading State -->
     <div id="loadingIndicator" class="loading-container hidden">
       <div class="spinner"></div>
@@ -517,5 +565,26 @@
   </footer>
 
   <script src="script.js"></script>
+  <script>
+  async function askOllama() {
+    const question = document.getElementById("question").value;
+    const answerBox = document.getElementById("answer");
+
+    answerBox.textContent = "Thinking...";
+
+    try {
+      const response = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ question })
+      });
+
+      const data = await response.json();
+      answerBox.textContent = data.answer;
+    } catch (error) {
+      answerBox.textContent = "Could not connect to Ollama.";
+    }
+  }
+  </script>
 </body>
 </html>

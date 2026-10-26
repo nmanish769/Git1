@@ -1050,3 +1050,80 @@ code {
   font-size: 1rem;
 }
 
+/* ---------- Instant Local Ollama Card ---------- */
+.ollama-card {
+  margin-top: 1.5rem;
+  border: 1px solid rgba(99, 102, 241, 0.35);
+  background: linear-gradient(180deg, rgba(30, 41, 59, 0.6) 0%, rgba(17, 24, 39, 0.95) 100%);
+  border-radius: 14px;
+}
+
+.ollama-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 0.75rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.ollama-card-title {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.ollama-badge-icon {
+  font-size: 1.5rem;
+}
+
+.ollama-heading {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.ollama-subheading {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.ollama-chat-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.ollama-action-row {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.ollama-status-tip {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+#answer {
+  display: none;
+  background: #0b1120;
+  border: 1px solid rgba(99, 102, 241, 0.3);
+  border-radius: 8px;
+  padding: 1rem;
+  margin-top: 0.5rem;
+  color: var(--text-primary);
+  font-size: 0.95rem;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  animation: fadeIn 0.25s ease;
+}
+
+#answer:not(:empty) {
+  display: block;
+}
+

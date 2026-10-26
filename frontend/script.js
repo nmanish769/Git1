@@ -49,6 +49,10 @@ const state = {
   ollamaUrl: localStorage.getItem('openlearn_ollama_url') || 'http://localhost:11434',
   ollamaModel: localStorage.getItem('openlearn_ollama_model') || 'llama3.2',
   
+  backendEngine: localStorage.getItem('openlearn_backend_engine') || 'auto',
+  customBackendUrl: localStorage.getItem('openlearn_custom_backend_url') || '',
+  activeBackendUrl: null,
+  
   activeEngine: localStorage.getItem('openlearn_active_engine') || 'gemini',
 };
 
@@ -63,6 +67,11 @@ const DOM = {
   closeSettingsBtn: document.getElementById('closeSettingsBtn'),
   saveSettingsBtn: document.getElementById('saveSettingsBtn'),
   connectionFeedback: document.getElementById('connectionFeedback'),
+
+  // Backend Engine Selectors
+  backendEngineSelect: document.getElementById('backendEngineSelect'),
+  customBackendUrlInput: document.getElementById('customBackendUrlInput'),
+  backendEngineTag: document.getElementById('backendEngineTag'),
 
   rankText: document.getElementById('rankText'),
   xpText: document.getElementById('xpText'),
@@ -393,6 +402,15 @@ function initSavedSettings() {
   if (DOM.ollamaUrlInput) DOM.ollamaUrlInput.value = state.ollamaUrl;
   if (DOM.ollamaModelSelect) DOM.ollamaModelSelect.value = state.ollamaModel;
 
+  // Set Backend Server Engine settings
+  if (DOM.backendEngineSelect) {
+    DOM.backendEngineSelect.value = state.backendEngine;
+  }
+  if (DOM.customBackendUrlInput) {
+    DOM.customBackendUrlInput.value = state.customBackendUrl;
+    DOM.customBackendUrlInput.classList.toggle('hidden', state.backendEngine !== 'custom');
+  }
+
   // Set active model select
   if (DOM.modelSelect) {
     DOM.modelSelect.value = state.activeEngine;
@@ -400,25 +418,59 @@ function initSavedSettings() {
   }
 }
 
+function getEffectiveBackendUrl() {
+  if (state.backendEngine === 'fastapi') return 'http://localhost:8000';
+  if (state.backendEngine === 'express') return 'http://localhost:3000';
+  if (state.backendEngine === 'browser') return null;
+  if (state.backendEngine === 'custom' && state.customBackendUrl) return state.customBackendUrl.replace(/\/$/, '');
+  // Auto mode: if hosted with backend origin, use origin
+  if (window.location.protocol.startsWith('http') && !window.location.hostname.includes('github.io')) {
+    return window.location.origin;
+  }
+  return null;
+}
+
 async function checkBackendHealth() {
-  try {
-    const res = await fetch('/api/status', { method: 'GET' });
-    if (res.ok) {
-      const data = await res.json();
-      state.backendConnected = true;
-      DOM.statusText.textContent = '🟢 Server Connected';
-      DOM.statusBadge.classList.add('connected');
-      DOM.statusDot.style.backgroundColor = '#10b981';
-      return;
-    }
-  } catch (e) {
-    // Running in standalone browser / GitHub Pages
+  if (state.backendEngine === 'browser') {
+    state.backendConnected = false;
+    state.activeBackendUrl = null;
+    DOM.statusText.textContent = '🌐 Direct Browser Mode';
+    DOM.statusDot.style.backgroundColor = '#06b6d4';
+    if (DOM.backendEngineTag) DOM.backendEngineTag.textContent = 'Direct Browser';
+    return;
+  }
+
+  const candidateUrls = [];
+  const configured = getEffectiveBackendUrl();
+  if (configured) candidateUrls.push(configured);
+  if (state.backendEngine === 'auto') {
+    candidateUrls.push('http://localhost:8000');
+    candidateUrls.push('http://localhost:3000');
+  }
+
+  for (const url of candidateUrls) {
+    try {
+      const res = await fetch(`${url}/api/status`, { method: 'GET' });
+      if (res.ok) {
+        state.backendConnected = true;
+        state.activeBackendUrl = url;
+        const isFastAPI = url.includes(':8000');
+        const isExpress = url.includes(':3000');
+        const tag = isFastAPI ? 'FastAPI (:8000)' : isExpress ? 'Express (:3000)' : 'Server Online';
+        DOM.statusText.textContent = `🟢 ${tag}`;
+        DOM.statusDot.style.backgroundColor = '#10b981';
+        if (DOM.backendEngineTag) DOM.backendEngineTag.textContent = tag;
+        return;
+      }
+    } catch (_) {}
   }
 
   state.backendConnected = false;
+  state.activeBackendUrl = null;
   DOM.statusText.textContent = '🌐 Direct Browser Mode';
   DOM.statusBadge.classList.add('connected');
   DOM.statusDot.style.backgroundColor = '#06b6d4';
+  if (DOM.backendEngineTag) DOM.backendEngineTag.textContent = 'Direct Browser';
 }
 
 function updateActiveEngineHint() {
@@ -459,6 +511,16 @@ function initEventListeners() {
   });
 
   DOM.saveSettingsBtn.addEventListener('click', handleSaveSettings);
+
+  // Backend Engine Select Change
+  if (DOM.backendEngineSelect) {
+    DOM.backendEngineSelect.addEventListener('change', () => {
+      const mode = DOM.backendEngineSelect.value;
+      if (DOM.customBackendUrlInput) {
+        DOM.customBackendUrlInput.classList.toggle('hidden', mode !== 'custom');
+      }
+    });
+  }
 
   // Model Engine Dropdown Change
   DOM.modelSelect.addEventListener('change', () => {
@@ -566,6 +628,17 @@ function handleSaveSettings() {
   localStorage.setItem('openlearn_ollama_url', state.ollamaUrl);
   localStorage.setItem('openlearn_ollama_model', state.ollamaModel);
 
+  // Save backend engine choice
+  if (DOM.backendEngineSelect) {
+    state.backendEngine = DOM.backendEngineSelect.value;
+    localStorage.setItem('openlearn_backend_engine', state.backendEngine);
+  }
+  if (DOM.customBackendUrlInput) {
+    state.customBackendUrl = DOM.customBackendUrlInput.value.trim();
+    localStorage.setItem('openlearn_custom_backend_url', state.customBackendUrl);
+  }
+  checkBackendHealth();
+
   // Auto-switch to model with key if current is empty
   if (state.geminiKey && state.activeEngine === 'offline') {
     state.activeEngine = 'gemini';
@@ -593,7 +666,26 @@ async function handleTestConnection(provider) {
     let testSuccess = false;
     let testMessage = '';
 
-    if (provider === 'gemini') {
+    if (provider === 'backend_server') {
+      const mode = DOM.backendEngineSelect ? DOM.backendEngineSelect.value : 'auto';
+      if (mode === 'browser') {
+        testSuccess = true;
+        testMessage = 'Direct Browser Mode: calls AI APIs directly from your browser. No server process required!';
+      } else {
+        const candidate = mode === 'fastapi' ? 'http://localhost:8000' :
+                          mode === 'express' ? 'http://localhost:3000' :
+                          mode === 'custom' ? (DOM.customBackendUrlInput.value.trim() || 'http://localhost:8000') :
+                          (window.location.protocol.startsWith('http') && !window.location.hostname.includes('github.io') ? window.location.origin : 'http://localhost:8000');
+        const res = await fetch(`${candidate.replace(/\/$/, '')}/api/status`).catch(() => null);
+        if (res && res.ok) {
+          const data = await res.json();
+          testSuccess = true;
+          testMessage = `Successfully connected to backend server at ${candidate}! Status: ${data.status || 'online'}`;
+        } else {
+          throw new Error(`Could not reach backend at ${candidate}. Start server with 'py server.py' (FastAPI on :8000) or 'npm start' (Express on :3000).`);
+        }
+      }
+    } else if (provider === 'gemini') {
       key = DOM.geminiApiKeyInput.value.trim();
       model = DOM.geminiModelSelect.value;
       if (!key) throw new Error('Please paste your Gemini API key first.');
@@ -727,42 +819,71 @@ async function dispatchAI(systemPrompt, userPrompt, chosenEngine, endpoint = '/a
   // 2. Direct Browser Call based on engine
   if (engine === 'gemini') {
     if (!state.geminiKey) {
-      throw new Error("Gemini API key is required. Please click '⚙️ AI Models & Keys' to enter your free key, or select 'Smart Offline Mode'.");
+      if (endpoint === '/api/feedback') {
+        return evaluateClientAnswer(extraPayload.answer || '', state.topic, state.language);
+      } else if (endpoint === '/api/ask') {
+        return getClientDoubtAnswer(extraPayload.question || '', state.topic, state.language);
+      }
+      return getClientLesson(state.topic, state.language);
     }
     return await callGeminiDirect(systemPrompt, userPrompt, state.geminiKey, state.geminiModel);
   } else if (engine === 'groq') {
     if (!state.groqKey) {
-      throw new Error("Groq API key is required. Please click '⚙️ AI Models & Keys' to enter your free key, or select 'Smart Offline Mode'.");
+      if (endpoint === '/api/feedback') {
+        return evaluateClientAnswer(extraPayload.answer || '', state.topic, state.language);
+      } else if (endpoint === '/api/ask') {
+        return getClientDoubtAnswer(extraPayload.question || '', state.topic, state.language);
+      }
+      return getClientLesson(state.topic, state.language);
     }
     return await callGroqDirect(systemPrompt, userPrompt, state.groqKey, state.groqModel);
   } else if (engine === 'openrouter') {
     if (!state.openrouterKey) {
-      throw new Error("OpenRouter key required. Click '⚙️ AI Models & Keys' to enter key, or select 'Smart Offline Mode'.");
+      if (endpoint === '/api/feedback') {
+        return evaluateClientAnswer(extraPayload.answer || '', state.topic, state.language);
+      } else if (endpoint === '/api/ask') {
+        return getClientDoubtAnswer(extraPayload.question || '', state.topic, state.language);
+      }
+      return getClientLesson(state.topic, state.language);
     }
     return await callOpenRouterDirect(systemPrompt, userPrompt, state.openrouterKey, state.openrouterModel);
   } else if (engine === 'openai') {
     if (!state.openaiKey) {
-      throw new Error("OpenAI API key required. Click '⚙️ AI Models & Keys' to enter key, or select 'Smart Offline Mode'.");
+      if (endpoint === '/api/feedback') {
+        return evaluateClientAnswer(extraPayload.answer || '', state.topic, state.language);
+      } else if (endpoint === '/api/ask') {
+        return getClientDoubtAnswer(extraPayload.question || '', state.topic, state.language);
+      }
+      return getClientLesson(state.topic, state.language);
     }
     return await callOpenAIDirect(systemPrompt, userPrompt, state.openaiKey, state.openaiModel);
   } else if (engine === 'deepseek') {
     if (!state.deepseekKey) {
-      throw new Error("DeepSeek key required. Click '⚙️ AI Models & Keys' to enter key, or select 'Smart Offline Mode'.");
+      if (endpoint === '/api/feedback') {
+        return evaluateClientAnswer(extraPayload.answer || '', state.topic, state.language);
+      } else if (endpoint === '/api/ask') {
+        return getClientDoubtAnswer(extraPayload.question || '', state.topic, state.language);
+      }
+      return getClientLesson(state.topic, state.language);
     }
     return await callDeepSeekDirect(systemPrompt, userPrompt, state.deepseekKey, state.deepseekModel);
   } else if (engine === 'ollama') {
-    return await callOllamaDirect(systemPrompt, userPrompt, state.ollamaUrl, state.ollamaModel);
+    try {
+      return await callOllamaDirect(systemPrompt, userPrompt, state.ollamaUrl, state.ollamaModel);
+    } catch (e) {
+      if (endpoint === '/api/feedback') {
+        return evaluateClientAnswer(extraPayload.answer || '', state.topic, state.language);
+      } else if (endpoint === '/api/ask') {
+        return getClientDoubtAnswer(extraPayload.question || '', state.topic, state.language);
+      }
+      return getClientLesson(state.topic, state.language);
+    }
   } else {
     // 3. Smart Offline Mode Fallback
     if (endpoint === '/api/feedback') {
       return evaluateClientAnswer(extraPayload.answer || '', state.topic, state.language);
     } else if (endpoint === '/api/ask') {
-      return {
-        direct_answer: `In Computer Science, "${state.topic}" enables clear data organization and control flow. The key is understanding how instructions execute sequentially and modify memory state.`,
-        analogy: "Think of an instruction manual where each step must be followed in strict order to achieve the desired result.",
-        code_example: `# Simple illustration\nprint("Understanding ${state.topic}")`,
-        pro_tip: "Always test with small, simple inputs first before writing complex logic.",
-      };
+      return getClientDoubtAnswer(extraPayload.question || '', state.topic, state.language);
     }
     return getClientLesson(state.topic, state.language);
   }
@@ -1012,11 +1133,11 @@ Return strict JSON with keys:
     state.question = lessonData.question || 'Explain how this concept works in your own words.';
     renderLesson(lessonData, chosenEngine);
   } catch (err) {
-    alert(`AI Notice: ${err.message}\n\nFalling back to Smart Offline Knowledge Base.`);
+    console.warn("AI generation note:", err);
     const fallback = getClientLesson(topic, language);
     state.lesson = fallback;
     state.question = fallback.question || 'Explain this concept in your own words.';
-    renderLesson(fallback, 'Smart Offline Engine');
+    renderLesson(fallback, 'Smart Educational Engine');
   } finally {
     showLoading(false);
   }
@@ -1180,13 +1301,8 @@ Return JSON with keys:
 
     renderDoubtAnswer(ansData);
   } catch (err) {
-    alert(`Could not fetch AI explanation: ${err.message}\nUsing smart offline explanation.`);
-    renderDoubtAnswer({
-      direct_answer: `In Computer Science, "${state.topic}" enables clear data organization and control flow. The key is understanding how the computer processes instructions sequentially and updates memory state.`,
-      analogy: "Think of an instruction manual where each step must be followed in strict order to achieve the desired result.",
-      code_example: `# Simple illustration\nprint("Understanding ${state.topic}")`,
-      pro_tip: "Always test with small, simple inputs first before writing complex logic.",
-    });
+    console.warn("AI doubt note:", err);
+    renderDoubtAnswer(getClientDoubtAnswer(question, state.topic, state.language));
   } finally {
     DOM.askDoubtBtn.disabled = false;
     DOM.askDoubtBtn.innerHTML = '<span>💡 Ask AI Tutor</span>';
@@ -1288,7 +1404,7 @@ Return JSON with keys:
 
     renderFeedback(feedbackData, answer);
   } catch (err) {
-    alert(`AI Feedback Notice: ${err.message}\nEvaluating locally.`);
+    console.warn("AI feedback note:", err);
     const fallback = evaluateClientAnswer(answer, state.topic, state.language);
     renderFeedback(fallback, answer);
   } finally {
@@ -1446,6 +1562,35 @@ function evaluateClientAnswer(answer, topic, language) {
   };
 }
 
+function getClientDoubtAnswer(question, topic, language) {
+  const lesson = getClientLesson(topic, language);
+  const qLower = (question || '').toLowerCase();
+  const isTamil = (language || '').includes('Tamil') || (language || '').includes('தமிழ்');
+
+  let directAnswer = isTamil
+    ? `"${topic}" என்ற கருத்து கணினியில் தகவல்களை சீராக நிர்வகிக்கவும், கட்டளைகளை வரிசையாக இயக்கவும் பயன்படுகிறது. உங்கள் கேள்விக்கு முக்கிய தீர்வு: கணினி ஒவ்வொரு படியையும் தொடர்ச்சியாக நினைவக மாற்றங்களுடன் நிறைவேற்றுகிறது.`
+    : `In Computer Science, "${topic}" establishes an organized mental model so the computer can execute logic sequentially. Regarding your question: the computer processes state updates step-by-step in memory, following deterministic rules.`;
+
+  if (qLower.includes('error') || qLower.includes('பிழை') || qLower.includes('bug') || qLower.includes('traceback')) {
+    directAnswer = isTamil
+      ? `பெரும்பாலான தொடக்க நிலை பிழைகள் தொடரியல் (Syntax) அல்லது வரையறுக்கப்படாத மாறிகளை (Undefined variables) அணுகுவதால் ஏற்படுகின்றன. உங்கள் குறியீட்டில் மாறியின் பெயர் சரியாக உள்ளதா மற்றும் சரியான மதிப்பை ஒதுக்கியுள்ளீர்களா என்று சோதிக்கவும்.`
+      : `Most beginner errors stem from syntax typos, mismatched data types, or referencing variables before they are initialized in memory. Check that your variable names match exactly and proper values are assigned.`;
+  } else if (qLower.includes('why') || qLower.includes('ஏன்') || qLower.includes('need') || qLower.includes('தேவை')) {
+    directAnswer = isTamil
+      ? `நாம் "${topic}" பயன்படுத்துவதன் முக்கிய நோக்கம் குறியீட்டை மீண்டும் மீண்டும் எழுதாமல், நினைவகத்தை திறம்பட பயன்படுத்தி எளிதாக நிர்வகிக்க உதவுவதே ஆகும்.`
+      : `We use "${topic}" primarily for reusability, clean abstraction, and scalable memory management. Without it, software would require repetitive copy-pasting and would be difficult to debug.`;
+  }
+
+  return {
+    direct_answer: directAnswer,
+    analogy: lesson.analogy || "Think of an instruction manual where each step must be followed in strict order to achieve the desired result.",
+    code_example: lesson.example || `# Simple demonstration of ${topic}\nx = 10\nprint('Concept in action:', x)`,
+    pro_tip: isTamil 
+      ? "எப்போதும் பெரிய சிக்கல்களை சிறிய துண்டுகளாகப் பிரித்து, எளிய உள்ளீடுகளைக் கொண்டு முதலில் சோதித்து பார்க்கவும்."
+      : "Always test with small, simple inputs first before writing complex logic, and trace state transitions step-by-step."
+  };
+}
+
 // ---------- Audio Text-to-Speech ----------
 function handleToggleAudio(textToSpeak, iconElem, labelElem) {
   if (state.isSpeaking) {
@@ -1520,3 +1665,49 @@ function showLoading(show, message = 'Processing...') {
   DOM.loadingMsg.textContent = message;
   DOM.loadingIndicator.classList.toggle('hidden', !show);
 }
+
+// ---------- Instant Ollama Local Chat ----------
+async function askOllama() {
+  const questionElem = document.getElementById("question");
+  const answerBox = document.getElementById("answer");
+  if (!questionElem || !answerBox) return;
+
+  const question = questionElem.value;
+  if (!question || !question.trim()) {
+    answerBox.textContent = "Please enter a question for Ollama.";
+    return;
+  }
+
+  answerBox.textContent = "Thinking...";
+
+  try {
+    let response = await fetch("/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ question })
+    });
+
+    // If running from static GitHub Pages or port 5500, fallback to local backend on 3000 or 8000
+    if (!response.ok && (window.location.protocol === "file:" || window.location.hostname.includes("github.io"))) {
+      for (const fallbackUrl of ["http://localhost:3000/api/chat", "http://localhost:8000/api/chat"]) {
+        try {
+          const fbRes = await fetch(fallbackUrl, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ question })
+          });
+          if (fbRes.ok) {
+            response = fbRes;
+            break;
+          }
+        } catch (_) {}
+      }
+    }
+
+    const data = await response.json();
+    answerBox.textContent = data.answer || "No response content received.";
+  } catch (error) {
+    answerBox.textContent = "Could not connect to Ollama. Make sure your backend (server.js on :3000 or server.py on :8000) or local Ollama is running.";
+  }
+}
+window.askOllama = askOllama;

@@ -1,7 +1,7 @@
 """Unified Multi-Model LLM Interface for OpenLearn AI.
 
 Supported AI Models & Backends:
-  - Google Gemini: Gemini 2.0 Flash / 1.5 Flash (Generous free tier via Google AI Studio).
+  - Google Gemini: Gemini 2.0 Flash / 1.5 Flash (Free tier via Google AI Studio).
   - Groq Cloud: Blazing-fast inference (sub-second Llama 3.3 70B & Llama 3.1 8B).
   - OpenAI: Standard GPT-4o-mini / GPT-4o.
   - OpenRouter: Multi-model hub (DeepSeek R1, Llama 3.3, Qwen 2.5, free tier models).
@@ -14,6 +14,7 @@ Supported AI Models & Backends:
 import json
 import os
 import re
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 try:
@@ -23,7 +24,7 @@ except ImportError:
     requests = None
     RequestException = Exception
 
-from .mock_data import get_best_matching_lesson, evaluate_smart_answer
+from .mock_data import get_best_matching_lesson, evaluate_smart_answer, get_offline_doubt_answer
 
 TIMEOUT = 45
 
@@ -31,6 +32,30 @@ TIMEOUT = 45
 class LLMError(RuntimeError):
     """Custom exception for LLM communication or parsing failures."""
     pass
+
+
+# Auto-load .env file from project root or current dir
+def _load_env_file():
+    """Load key-value pairs from .env into os.environ if present."""
+    cur = Path(__file__).resolve().parent
+    candidates = [cur / ".env", cur.parent / ".env", cur.parent.parent / ".env"]
+    for path in candidates:
+        if path.exists() and path.is_file():
+            try:
+                with open(path, "r", encoding="utf-8") as f:
+                    for line in f:
+                        line = line.strip()
+                        if line and not line.startswith("#") and "=" in line:
+                            k, v = line.split("=", 1)
+                            k = k.strip()
+                            v = v.strip().strip('"').strip("'")
+                            if k and k not in os.environ:
+                                os.environ[k] = v
+            except Exception:
+                pass
+            break
+
+_load_env_file()
 
 
 # Backend specifications: (driver_type, default_url, default_model, env_var_name)
@@ -109,7 +134,6 @@ def get_resolved_api_key(backend_name: str, user_provided_key: str = "") -> str:
     info = BACKENDS.get(backend_name)
     env_var_name = info[3] if info else ""
     if not env_var_name:
-        # Check generic backends by keyword
         b_low = backend_name.lower()
         if "gemini" in b_low:
             env_var_name = "GEMINI_API_KEY"
@@ -145,12 +169,10 @@ def _call_gemini(base_url: str, model: str, system: str, user: str, api_key: str
     if requests is None:
         raise LLMError("The 'requests' package is not installed. Run: pip install requests")
 
-    # Clean model name
-    m = model.strip()
+    m = model.strip() if model else "gemini-1.5-flash"
     if not m.startswith("gemini"):
         m = "gemini-1.5-flash"
 
-    # Prefer direct REST API
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{m}:generateContent?key={api_key}"
     headers = {"Content-Type": "application/json"}
     payload = {
@@ -242,7 +264,6 @@ def _call_openai_compat(base_url: str, model: str, messages: list, api_key: str 
         "temperature": 0.3,
     }
 
-    # Enable JSON mode for compatible providers
     url_lower = url.lower()
     if any(k in url_lower for k in ["groq", "openai", "deepseek"]):
         payload["response_format"] = {"type": "json_object"}
@@ -272,7 +293,6 @@ def extract_json(text: str) -> dict:
         raise LLMError("The model returned an empty response.")
 
     cleaned = text.strip()
-    # Strip markdown code blocks
     cleaned = re.sub(r"^```(?:json)?", "", cleaned, flags=re.MULTILINE)
     cleaned = re.sub(r"```$", "", cleaned, flags=re.MULTILINE).strip()
 
@@ -285,7 +305,6 @@ def extract_json(text: str) -> dict:
     try:
         return json.loads(json_str)
     except json.JSONDecodeError:
-        # Minimal repair: escape raw newlines inside strings
         try:
             sanitized = re.sub(r'(?<!\\)\n', '\\n', json_str)
             return json.loads(sanitized)
@@ -305,26 +324,26 @@ def ask_json(
     """Execute LLM query with driver routing, API key resolution, and offline fallback."""
     b_lower = backend.lower()
 
-    # Smart Offline Mode
+    # Extract topic and language from user prompt
+    t_match = re.search(r'topic: "([^"]+)"', user, re.IGNORECASE)
+    if not t_match:
+        t_match = re.search(r'studying "([^"]+)"', user, re.IGNORECASE)
+    topic = t_match.group(1) if t_match else "variables"
+    lang = "Tamil" if ("tamil" in user.lower() or "தமிழ்" in user) else "English"
+
+    # Smart Offline Mode Explicit Request
     if "offline" in b_lower or "demo" in b_lower:
         if "feedback" in user.lower() or "learner's answer" in user.lower():
             ans = ""
             for line in user.split("\n"):
                 if "Learner's answer:" in line:
                     ans = line.replace("Learner's answer:", "").strip()
-            return evaluate_smart_answer("", ans, {}, "English")
+            return evaluate_smart_answer("", ans, {}, lang)
         elif "doubt" in user.lower() or "student's question" in user.lower():
-            return {
-                "direct_answer": "In Computer Science, this concept creates an organized abstraction so computers can execute logic efficiently.",
-                "analogy": "Like building with Lego blocks: each block has a specific role, and when connected properly, they form a robust structure.",
-                "code_example": "# Core demonstration\nx = 10\nprint('Concept in action:', x)",
-                "pro_tip": "Always test edge cases (empty inputs, zero, maximum boundaries) when building algorithms.",
-                "diagram": "flowchart LR\n    A[Input Question] --> B[Conceptual Model]\n    B --> C[Clear Solution]"
-            }
+            q_match = re.search(r'Question: "([^"]+)"', user)
+            q_text = q_match.group(1) if q_match else "How does this concept work?"
+            return get_offline_doubt_answer(q_text, topic, lang)
         else:
-            t_match = re.search(r'topic: "([^"]+)"', user)
-            topic = t_match.group(1) if t_match else "variables"
-            lang = "Tamil" if ("tamil" in user.lower() or "தமிழ்" in user) else "English"
             return get_best_matching_lesson(topic, lang)
 
     resolved_key = get_resolved_api_key(backend, api_key)
@@ -338,7 +357,6 @@ def ask_json(
                 model = b_info[2]
             break
 
-    # Determine driver by provider keyword if not matched
     if "gemini" in b_lower or "google" in b_lower:
         driver_type = "gemini"
     elif "ollama" in b_lower:
@@ -346,12 +364,20 @@ def ask_json(
     elif "openrouter" in b_lower:
         driver_type = "openrouter"
 
-    # Validate API key
+    # If key is not provided for cloud provider, fallback gracefully to smart engine
     if driver_type in ["gemini", "openai_compat", "openrouter"] and not resolved_key and "localhost" not in base_url:
-        raise LLMError(
-            f"API Key required for {backend}. Please click '⚙️ Settings' in the top bar to enter your free key, "
-            f"or select 'Smart Offline Mode' for instant access without a key!"
-        )
+        if "feedback" in user.lower() or "learner's answer" in user.lower():
+            ans = ""
+            for line in user.split("\n"):
+                if "Learner's answer:" in line:
+                    ans = line.replace("Learner's answer:", "").strip()
+            return evaluate_smart_answer("", ans, {}, lang)
+        elif "doubt" in user.lower() or "student's question" in user.lower():
+            q_match = re.search(r'Question: "([^"]+)"', user)
+            q_text = q_match.group(1) if q_match else "How does this concept work?"
+            return get_offline_doubt_answer(q_text, topic, lang)
+        else:
+            return get_best_matching_lesson(topic, lang)
 
     messages = [
         {"role": "system", "content": system},
@@ -377,7 +403,12 @@ def ask_json(
         except Exception as e:
             last_err = LLMError(f"Request failed: {e}")
 
-    raise last_err if last_err else LLMError("Unknown error contacting AI model.")
+    # Fallback to smart knowledge base instead of crashing
+    if "feedback" in user.lower():
+        return evaluate_smart_answer("", user, {}, lang)
+    elif "doubt" in user.lower():
+        return get_offline_doubt_answer(user, topic, lang)
+    return get_best_matching_lesson(topic, lang)
 
 
 def test_model_connection(backend: str, api_key: str = "", base_url: str = "", model: str = "") -> Dict[str, Any]:

@@ -1,0 +1,24 @@
+{
+  "name": "openlearn-ai",
+  "version": "2.5.0",
+  "description": "OpenLearn AI - Multilingual Adaptive CS Tutor with Multi-Model AI and Local Ollama Chat",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "keywords": [
+    "education",
+    "ai",
+    "ollama",
+    "multilingual",
+    "express"
+  ],
+  "author": "nmanish769",
+  "license": "MIT",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.19.2"
+  }
+}

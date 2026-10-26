@@ -40,7 +40,7 @@ git add -A
 git diff --cached --quiet
 if %ERRORLEVEL% NEQ 0 (
     echo 💾 Committing updates...
-    git commit -m "Update OpenLearn AI full-stack structure, AI model links, and doubt solver"
+    git commit -m "Add Ollama chat API (/api/chat), Express server.js on port 3000, and interactive chat UI"
 ) else (
     echo ℹ️ Working tree is clean (no new changes to commit).
 )
